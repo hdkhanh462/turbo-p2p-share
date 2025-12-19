@@ -10,22 +10,24 @@
 		"start": "node dist/index.js"
 	},
 	"dependencies": {
-		"express": "^5.1.0",
-		"cors": "^2.8.5",
-		"@orpc/server": "^1.12.2",
 		"@orpc/openapi": "^1.12.2",
+		"@orpc/server": "^1.12.2",
 		"@orpc/zod": "^1.12.2",
+		"@turbo-p2p-share/api": "*",
+		"@turbo-p2p-share/shared": "*",
+		"cors": "^2.8.5",
 		"dotenv": "^17.2.2",
-		"zod": "^4.1.13",
-		"@turbo-p2p-share/api": "*"
+		"express": "^5.1.0",
+		"socket.io": "^4.8.1",
+		"zod": "^4.1.13"
 	},
 	"devDependencies": {
-		"@types/express": "^5.0.1",
+		"@turbo-p2p-share/config": "*",
 		"@types/cors": "^2.8.17",
-		"tsx": "^4.19.2",
+		"@types/express": "^5.0.1",
 		"@types/node": "^22.13.11",
-		"typescript": "^5",
 		"tsdown": "^0.16.5",
-		"@turbo-p2p-share/config": "*"
+		"tsx": "^4.19.2",
+		"typescript": "^5"
 	}
 }

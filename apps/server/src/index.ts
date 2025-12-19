@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { createServer } from "node:http";
 import { OpenAPIHandler } from "@orpc/openapi/node";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
 import { onError } from "@orpc/server";
@@ -7,6 +8,7 @@ import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { appRouter } from "@turbo-p2p-share/api/routers/index";
 import cors from "cors";
 import express from "express";
+import { setupSocket } from "@/lib/socket";
 
 const app = express();
 
@@ -40,13 +42,13 @@ const apiHandler = new OpenAPIHandler(appRouter, {
 app.use(async (req, res, next) => {
 	const rpcResult = await rpcHandler.handle(req, res, {
 		prefix: "/rpc",
-		context: {},
+		context: { session: null },
 	});
 	if (rpcResult.matched) return;
 
 	const apiResult = await apiHandler.handle(req, res, {
 		prefix: "/api-reference",
-		context: {},
+		context: { session: null },
 	});
 	if (apiResult.matched) return;
 
@@ -60,6 +62,10 @@ app.get("/", (_req, res) => {
 });
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
-	console.log(`Server is running on port ${port}`);
+const server = createServer(app);
+
+setupSocket(server);
+
+server.listen(port, () => {
+	console.log(`Server running on: ${port}`);
 });
