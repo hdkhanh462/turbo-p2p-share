@@ -17,6 +17,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { link, type orpc } from "@/utils/orpc";
 
 import "../index.css";
+import { AlertDialogProvider } from "@/hooks/use-alert-dialog";
+import { SocketProvider } from "@/hooks/use-socket";
 
 export interface RouterAppContext {
 	orpc: typeof orpc;
@@ -58,8 +60,12 @@ function RootComponent() {
 				storageKey="vite-ui-theme"
 			>
 				<div className="grid h-svh grid-rows-[auto_1fr]">
-					<Header />
-					<Outlet />
+					{/* <Header /> */}
+					<AlertDialogProvider>
+						<SocketProvider>
+							<Outlet />
+						</SocketProvider>
+					</AlertDialogProvider>
 				</div>
 				<Toaster richColors />
 			</ThemeProvider>

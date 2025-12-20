@@ -1,6 +1,6 @@
 {
 	"$schema": "https://ui.shadcn.com/schema.json",
-	"style": "new-york",
+	"style": "base-nova",
 	"rsc": false,
 	"tsx": true,
 	"tailwind": {
@@ -10,6 +10,7 @@
 		"cssVariables": true,
 		"prefix": ""
 	},
+	"iconLibrary": "lucide",
 	"aliases": {
 		"components": "@/components",
 		"utils": "@/lib/utils",
@@ -17,5 +18,10 @@
 		"lib": "@/lib",
 		"hooks": "@/hooks"
 	},
-	"iconLibrary": "lucide"
+	"menuColor": "default",
+	"menuAccent": "subtle",
+	"registries": {
+		"@hdkhanh-ui": "https://next-shadcn-components.vercel.app/r/{name}.json",
+		"@wds": "https://wds-shadcn-registry.netlify.app/r/{name}.json"
+	}
 }
