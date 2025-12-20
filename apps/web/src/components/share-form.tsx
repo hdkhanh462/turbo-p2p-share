@@ -78,8 +78,8 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 	);
 	const onRoomJoined = useCallback<ServerToClientHandlers["room:join"]>(
 		({ roomId }) => {
-			setIsConnecting(false);
-			setCurrentRoomId(roomId);
+			// setCurrentRoomId(roomId);
+			console.log("Joined room:", roomId);
 		},
 		[],
 	);
@@ -91,7 +91,10 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 				cancel: { label: "Reject", props: { variant: "destructive" } },
 				action: { label: "Accept" },
 			});
-			if (!accept) return;
+			if (!accept) {
+				shareSocket.rejectJoin({ roomId });
+				return;
+			}
 
 			const pc = webrtc.initSender();
 			pc.onicecandidate = (e) => {
@@ -111,16 +114,18 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 		},
 		[alert, shareSocket, webrtc.initSender],
 	);
-	const onRoomAccepted = useCallback<
-		ServerToClientHandlers["room:accept"]
-	>(() => {
-		setIsConnecting(false);
-		console.log("Room accepted, waiting for offer...");
-	}, []);
+	const onRoomAccepted = useCallback<ServerToClientHandlers["room:accept"]>(
+		({ roomId }) => {
+			setIsConnecting(false);
+			setCurrentRoomId(roomId);
+			console.log("Room accepted, waiting for offer...");
+		},
+		[],
+	);
 	const onRoomRejected = useCallback<ServerToClientHandlers["room:reject"]>(
 		({ userId }) => {
 			setIsConnecting(false);
-			console.log(`Join request rejected for user ${userId}`);
+			console.log(`Join request rejected by: ${userId}`);
 		},
 		[],
 	);
@@ -129,7 +134,6 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 	>(() => {
 		webrtc.cleanup();
 		setCurrentRoomId(undefined);
-		setIsConnecting(false);
 	}, [webrtc.cleanup]);
 	useRoomSocket({
 		socket: shareSocket.socket,
@@ -214,13 +218,13 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 		[],
 	);
 	useEffect(() => {
-		shareSocket.createRoom({ roomId: shareSocket.userId });
+		shareSocket.createRoom({ roomId: shareSocket.randomId });
 		shareSocket.socket?.on("error", onError);
 	}, [
 		onError,
 		shareSocket.createRoom,
 		shareSocket.socket?.on,
-		shareSocket.userId,
+		shareSocket.randomId,
 	]);
 	//#endregion
 
@@ -234,9 +238,11 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 		setIsConnecting(true);
 
 		shareSocket.joinRoom({ roomId: partnerRoomId });
+
+		if (!shareSocket.socket?.id) return;
 		shareSocket.requestJoin({
 			roomId: partnerRoomId,
-			userId: shareSocket.userId,
+			userId: shareSocket.socket.id,
 		});
 	};
 
@@ -311,11 +317,12 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 						</div>
 						<UploadFile
 							file={webrtc.file}
+							status={webrtc.status}
 							progress={webrtc.progress}
 							sendFile={webrtc.sendFile}
 							setFile={webrtc.setFile}
 							setProgress={webrtc.setProgress}
-							status={webrtc.status}
+							setStatus={webrtc.setStatus}
 						/>
 					</FieldGroup>
 				</form>

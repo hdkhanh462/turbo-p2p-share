@@ -23,7 +23,7 @@ export type SocketTyped = Socket<
 interface SocketContextType {
 	socket: SocketTyped | null;
 	isConnected: boolean;
-	userId: string;
+	randomId: string;
 	createRoom: ClientToServerHandlers["room:create"];
 	joinRoom: ClientToServerHandlers["room:join"];
 	requestJoin: ClientToServerHandlers["room:request"];
@@ -48,7 +48,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
 	const socketRef = useRef<SocketTyped | null>(null);
 	const [isConnected, setIsConnected] = useState(false);
-	const userId = useMemo(() => nanoid(10), []);
+	const randomId = useMemo(() => `room_${nanoid(10)}`, []);
 
 	useEffect(() => {
 		const socket = io(import.meta.env.VITE_SERVER_URL, {
@@ -133,7 +133,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
 			value={{
 				socket: socketRef.current,
 				isConnected,
-				userId,
+				randomId,
 				createRoom,
 				joinRoom,
 				requestJoin,

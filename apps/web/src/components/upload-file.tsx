@@ -8,6 +8,7 @@ type Props = {
 	setFile: (file: File) => void;
 	sendFile: () => void;
 	setProgress: (progress: number) => void;
+	setStatus: (status: RTCDataChannelStatus) => void;
 };
 
 export const UploadFile = ({
@@ -17,6 +18,7 @@ export const UploadFile = ({
 	setFile,
 	sendFile,
 	setProgress,
+	setStatus,
 }: Props) => {
 	return (
 		<div
@@ -46,6 +48,7 @@ export const UploadFile = ({
 					if (e.target.files?.[0]) {
 						setFile(e.target.files[0]);
 						setProgress(0);
+						if (status === "done") setStatus("connected");
 					}
 				}}
 			/>

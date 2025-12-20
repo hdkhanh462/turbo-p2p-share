@@ -40,12 +40,13 @@ export function setupSocket(server: HttpServer) {
 			socket.to(payload.roomId).emit("room:request", payload);
 		});
 
-		socket.on("room:accept", ({ roomId }) => {
-			socket.to(roomId).emit("room:accept");
+		socket.on("room:accept", (payload) => {
+			io.to(payload.roomId).emit("room:accept", payload);
 		});
 
-		socket.on("room:reject", ({ roomId, userId }) => {
-			socket.to(roomId).emit("room:reject", { userId });
+		socket.on("room:reject", ({ roomId }) => {
+			// TODO: If exist => leave
+			socket.to(roomId).emit("room:reject", { userId: socket.id });
 		});
 
 		socket.on("room:terminate", (roomId) => {

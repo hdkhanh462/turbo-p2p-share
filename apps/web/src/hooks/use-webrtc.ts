@@ -14,9 +14,13 @@ export const useWebRTC = () => {
 	const dataChannelRef = useRef<RTCDataChannel | null>(null);
 	const receivedBuffersRef = useRef<ArrayBuffer[]>([]);
 	const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+	const receivedMetaRef = useRef<{
+		name: string;
+		mime: string;
+	} | null>(null);
 	const [file, setFile] = useState<File | null>(null);
 	const [progress, setProgress] = useState(0);
-	const [status, setStatus] = useState<RTCDataChannelStatus>("connecting");
+	const [status, setStatus] = useState<RTCDataChannelStatus>("idle");
 
 	const initReceiver = () => {
 		cleanup();
@@ -32,15 +36,33 @@ export const useWebRTC = () => {
 			channel.onmessage = (e) => {
 				if (typeof e.data === "string") {
 					const msg = JSON.parse(e.data);
-					if (msg.done) {
-						const blob = new Blob(receivedBuffersRef.current);
+
+					if (msg.type === "meta") {
+						receivedMetaRef.current = {
+							name: msg.name,
+							mime: msg.mime || "application/octet-stream",
+						};
+						return;
+					}
+
+					if (msg.type === "done" && receivedMetaRef.current) {
+						console.log("DONE:", receivedMetaRef.current);
+						const blob = new Blob(receivedBuffersRef.current, {
+							type: receivedMetaRef.current.mime,
+						});
+
 						const url = URL.createObjectURL(blob);
 
 						const a = document.createElement("a");
 						a.href = url;
-						a.download = "received_file";
+						a.download = receivedMetaRef.current.name;
 						a.click();
+
 						URL.revokeObjectURL(url);
+
+						receivedBuffersRef.current = [];
+						receivedMetaRef.current = null;
+						setStatus("done");
 					}
 				} else {
 					receivedBuffersRef.current.push(e.data);
@@ -71,6 +93,16 @@ export const useWebRTC = () => {
 		if (!file || !dataChannelRef.current) return;
 
 		setStatus("sending");
+		setProgress(0);
+
+		dataChannelRef.current.send(
+			JSON.stringify({
+				type: "meta",
+				name: file.name,
+				mime: file.type,
+				size: file.size,
+			}),
+		);
 
 		let offset = 0;
 
@@ -87,7 +119,7 @@ export const useWebRTC = () => {
 			}
 		}
 
-		dataChannelRef.current.send(JSON.stringify({ done: true }));
+		dataChannelRef.current.send(JSON.stringify({ type: "done" }));
 		setStatus("done");
 	};
 
@@ -119,7 +151,7 @@ export const useWebRTC = () => {
 		pcRef.current = null;
 		receivedBuffersRef.current = [];
 		setProgress(0);
-		setStatus("connecting");
+		setStatus("idle");
 	};
 
 	return {
