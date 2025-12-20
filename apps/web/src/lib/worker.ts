@@ -7,7 +7,7 @@ let totalChunks = 0;
 let currentChunk = 0;
 let lastProgress = -1;
 
-type EventData =
+export type ReceiverWorkerMessage =
 	| {
 			type: "fileInfo";
 			fileSize: number;
@@ -21,55 +21,69 @@ type EventData =
 			data: ArrayBuffer;
 	  };
 
-self.addEventListener("message", (event: MessageEvent<EventData>) => {
-	const data = event.data;
+export type SenderWorkerMessage =
+	| {
+			type: "downloadComplete";
+			blob: Blob;
+			timeTaken: number;
+	  }
+	| {
+			type: "updateProgress";
+			progress: number;
+	  };
 
-	/* ---------- FILE INFO ---------- */
-	if (data.type === "fileInfo") {
-		fileSize = data.fileSize;
-		chunkSize = data.chunkSize ?? chunkSize;
-		totalChunks = Math.ceil(fileSize / chunkSize);
+self.addEventListener(
+	"message",
+	(event: MessageEvent<ReceiverWorkerMessage>) => {
+		const data = event.data;
 
-		chunks.length = 0;
-		currentChunk = 0;
-		lastProgress = -1;
-		startTime = null;
-		return;
-	}
+		/* ---------- FILE INFO ---------- */
+		if (data.type === "fileInfo") {
+			fileSize = data.fileSize;
+			chunkSize = data.chunkSize ?? chunkSize;
+			totalChunks = Math.ceil(fileSize / chunkSize);
 
-	/* ---------- DOWNLOAD ---------- */
-	if (data.type === "download") {
-		if (!startTime) return;
+			chunks.length = 0;
+			currentChunk = 0;
+			lastProgress = -1;
+			startTime = null;
+			return;
+		}
 
-		const blob = new Blob(chunks, {
-			type: "application/octet-stream",
-		});
+		/* ---------- DOWNLOAD ---------- */
+		if (data.type === "download") {
+			if (!startTime) return;
 
-		const timeTaken = performance.now() - startTime;
+			const blob = new Blob(chunks, {
+				type: "application/octet-stream",
+			});
 
-		self.postMessage({ type: "downloadComplete", blob, timeTaken });
+			const timeTaken = performance.now() - startTime;
 
-		chunks.length = 0;
-		currentChunk = 0;
-		startTime = null;
-		return;
-	}
+			self.postMessage({ type: "downloadComplete", blob, timeTaken });
 
-	/* ---------- DATA CHUNK ---------- */
-	if (!(data instanceof ArrayBuffer)) return;
-	if (!totalChunks) return;
+			chunks.length = 0;
+			currentChunk = 0;
+			startTime = null;
+			return;
+		}
 
-	if (startTime === null) {
-		startTime = performance.now();
-	}
+		/* ---------- DATA CHUNK ---------- */
+		if (!(data instanceof ArrayBuffer)) return;
+		if (!totalChunks) return;
 
-	chunks.push(data);
-	currentChunk++;
+		if (startTime === null) {
+			startTime = performance.now();
+		}
 
-	const progress = Math.floor((currentChunk / totalChunks) * 100);
+		chunks.push(data);
+		currentChunk++;
 
-	if (progress !== lastProgress) {
-		lastProgress = progress;
-		self.postMessage({ type: "updateProgress", progress });
-	}
-});
+		const progress = Math.floor((currentChunk / totalChunks) * 100);
+
+		if (progress !== lastProgress) {
+			lastProgress = progress;
+			self.postMessage({ type: "updateProgress", progress });
+		}
+	},
+);

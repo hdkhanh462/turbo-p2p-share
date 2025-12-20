@@ -1,5 +1,3 @@
-import "dotenv/config";
-import { createServer } from "node:http";
 import { OpenAPIHandler } from "@orpc/openapi/node";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
 import { onError } from "@orpc/server";
@@ -7,14 +5,16 @@ import { RPCHandler } from "@orpc/server/node";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { appRouter } from "@turbo-p2p-share/api/routers/index";
 import cors from "cors";
+import { setupSocket } from "@/lib/socket";
+import "dotenv/config";
+import { createServer } from "node:http";
 import express from "express";
-import { type PendingRoom, setupSocket } from "@/lib/socket";
 
 const app = express();
 
 app.use(
 	cors({
-		origin: process.env.CORS_ORIGIN || "",
+		// origin: process.env.CORS_ORIGIN || "",
 		methods: ["GET", "POST", "OPTIONS"],
 	}),
 );
@@ -64,8 +64,7 @@ app.get("/", (_req, res) => {
 const port = process.env.PORT || 3000;
 const server = createServer(app);
 
-const pendingRooms: Record<string, PendingRoom> = {};
-setupSocket(server, pendingRooms);
+setupSocket(server);
 
 server.listen(port, () => {
 	console.log(`Server running on: ${port}`);
