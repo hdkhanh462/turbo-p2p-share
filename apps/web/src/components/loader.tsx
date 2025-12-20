@@ -1,9 +1,19 @@
-import { Loader2 } from "lucide-react";
+import { Loader2Icon } from "lucide-react";
+import type { PropsWithChildren, ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
-export default function Loader() {
-	return (
-		<div className="flex h-full items-center justify-center pt-8">
-			<Loader2 className="animate-spin" />
-		</div>
-	);
+type Props = PropsWithChildren & {
+  isLoading?: boolean;
+  className?: string;
+  fallback?: ReactNode;
+};
+
+export default function Loader({ isLoading, fallback, ...props }: Props) {
+  if (isLoading)
+    return fallback ? (
+      fallback
+    ) : (
+      <Loader2Icon className={cn("animate-spin", props.className)} />
+    );
+  return props.children;
 }

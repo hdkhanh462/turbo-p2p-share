@@ -8,7 +8,7 @@ import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { appRouter } from "@turbo-p2p-share/api/routers/index";
 import cors from "cors";
 import express from "express";
-import { setupSocket } from "@/lib/socket";
+import { type PendingRoom, setupSocket } from "@/lib/socket";
 
 const app = express();
 
@@ -64,7 +64,8 @@ app.get("/", (_req, res) => {
 const port = process.env.PORT || 3000;
 const server = createServer(app);
 
-setupSocket(server);
+const pendingRooms: Record<string, PendingRoom> = {};
+setupSocket(server, pendingRooms);
 
 server.listen(port, () => {
 	console.log(`Server running on: ${port}`);
