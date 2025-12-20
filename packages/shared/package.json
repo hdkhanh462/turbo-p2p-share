@@ -11,16 +11,16 @@
 	},
 	"scripts": {},
 	"dependencies": {
-		"@orpc/server": "^1.12.2",
 		"@orpc/client": "^1.12.2",
 		"@orpc/openapi": "^1.12.2",
+		"@orpc/server": "^1.12.2",
 		"@orpc/zod": "^1.12.2",
 		"dotenv": "^17.2.2",
 		"zod": "^4.1.13"
 	},
 	"devDependencies": {
+		"@turbo-p2p-share/config": "*",
 		"@types/express": "^5.0.1",
-		"typescript": "^5",
-		"@turbo-p2p-share/config": "*"
+		"typescript": "^5"
 	}
 }

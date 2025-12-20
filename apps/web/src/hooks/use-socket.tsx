@@ -1,7 +1,6 @@
-import {
-	type ClientToServerHandlers,
-	type ServerToClientHandlers,
-	SocketEvent,
+import type {
+	ClientToServerHandlers,
+	ServerToClientHandlers,
 } from "@turbo-p2p-share/shared/types/socket";
 import { nanoid } from "nanoid";
 import type React from "react";
@@ -16,18 +15,24 @@ import {
 } from "react";
 import { io, type Socket } from "socket.io-client";
 
-type SocketTyped = Socket<ServerToClientHandlers, ClientToServerHandlers>;
+export type SocketTyped = Socket<
+	ServerToClientHandlers,
+	ClientToServerHandlers
+>;
 
 interface SocketContextType {
 	socket: SocketTyped | null;
 	isConnected: boolean;
-	userId: string;
-	createRoom: ClientToServerHandlers[SocketEvent.ROOM_PRE_CREATE];
-	joinRequest: ClientToServerHandlers[SocketEvent.ROOM_JOIN_REQUEST];
-	acceptJoin: ClientToServerHandlers[SocketEvent.ROOM_JOIN_ACCEPT];
-	rejectJoin: ClientToServerHandlers[SocketEvent.ROOM_JOIN_REJECT];
-	terminateRoom: ClientToServerHandlers[SocketEvent.ROOM_TERMINATE];
-	sendMessage: ClientToServerHandlers[SocketEvent.ROOM_MESSAGE];
+	randomId: string;
+	createRoom: ClientToServerHandlers["room:create"];
+	joinRoom: ClientToServerHandlers["room:join"];
+	requestJoin: ClientToServerHandlers["room:request"];
+	acceptJoin: ClientToServerHandlers["room:accept"];
+	rejectJoin: ClientToServerHandlers["room:reject"];
+	terminateRoom: ClientToServerHandlers["room:terminate"];
+	offer: ClientToServerHandlers["file:offer"];
+	answer: ClientToServerHandlers["file:answer"];
+	candidate: ClientToServerHandlers["file:candidate"];
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -43,7 +48,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
 	const socketRef = useRef<SocketTyped | null>(null);
 	const [isConnected, setIsConnected] = useState(false);
-	const userId = useMemo(() => nanoid(10), []);
+	const randomId = useMemo(() => `room_${nanoid(10)}`, []);
 
 	useEffect(() => {
 		const socket = io(import.meta.env.VITE_SERVER_URL, {
@@ -61,57 +66,83 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
 		};
 	}, []);
 
-	const createRoom = useCallback<
-		ClientToServerHandlers[SocketEvent.ROOM_PRE_CREATE]
-	>(({ userId }) => {
-		socketRef.current?.emit(SocketEvent.ROOM_PRE_CREATE, { userId });
+	//#region Client to Server Handlers
+	const createRoom = useCallback<ClientToServerHandlers["room:create"]>(
+		(payload) => {
+			socketRef.current?.emit("room:create", payload);
+		},
+		[],
+	);
+
+	const joinRoom = useCallback<ClientToServerHandlers["room:join"]>(
+		(payload) => {
+			socketRef.current?.emit("room:join", payload);
+		},
+		[],
+	);
+
+	const requestJoin = useCallback<ClientToServerHandlers["room:request"]>(
+		(payload) => {
+			socketRef.current?.emit("room:request", payload);
+		},
+		[],
+	);
+
+	const acceptJoin = useCallback<ClientToServerHandlers["room:accept"]>(
+		(payload) => {
+			socketRef.current?.emit("room:accept", payload);
+		},
+		[],
+	);
+
+	const rejectJoin = useCallback<ClientToServerHandlers["room:reject"]>(
+		(payload) => {
+			socketRef.current?.emit("room:reject", payload);
+		},
+		[],
+	);
+
+	const terminateRoom = useCallback<ClientToServerHandlers["room:terminate"]>(
+		(payload) => {
+			socketRef.current?.emit("room:terminate", payload);
+		},
+		[],
+	);
+
+	const candidate = useCallback<ClientToServerHandlers["file:candidate"]>(
+		(payload) => {
+			socketRef.current?.emit("file:candidate", payload);
+		},
+		[],
+	);
+
+	const offer = useCallback<ClientToServerHandlers["file:offer"]>((payload) => {
+		socketRef.current?.emit("file:offer", payload);
 	}, []);
 
-	const joinRequest = useCallback<
-		ClientToServerHandlers[SocketEvent.ROOM_JOIN_REQUEST]
-	>(({ roomId, userId }) => {
-		socketRef.current?.emit(SocketEvent.ROOM_JOIN_REQUEST, { roomId, userId });
-	}, []);
-
-	const acceptJoin = useCallback<
-		ClientToServerHandlers[SocketEvent.ROOM_JOIN_ACCEPT]
-	>((roomId) => {
-		socketRef.current?.emit(SocketEvent.ROOM_JOIN_ACCEPT, roomId);
-	}, []);
-
-	const rejectJoin = useCallback<
-		ClientToServerHandlers[SocketEvent.ROOM_JOIN_REJECT]
-	>((roomId) => {
-		socketRef.current?.emit(SocketEvent.ROOM_JOIN_REJECT, roomId);
-	}, []);
-
-	const terminateRoom = useCallback<
-		ClientToServerHandlers[SocketEvent.ROOM_TERMINATE]
-	>((roomId) => {
-		socketRef.current?.emit(SocketEvent.ROOM_TERMINATE, roomId);
-	}, []);
-
-	const sendMessage = useCallback<
-		ClientToServerHandlers[SocketEvent.ROOM_MESSAGE]
-	>(({ roomId, message }) => {
-		socketRef.current?.emit(SocketEvent.ROOM_MESSAGE, {
-			roomId,
-			message,
-		});
-	}, []);
+	const answer = useCallback<ClientToServerHandlers["file:answer"]>(
+		(payload) => {
+			socketRef.current?.emit("file:answer", payload);
+		},
+		[],
+	);
+	//#endregion
 
 	return (
 		<SocketContext.Provider
 			value={{
 				socket: socketRef.current,
 				isConnected,
-				userId,
+				randomId,
 				createRoom,
-				joinRequest,
+				joinRoom,
+				requestJoin,
 				acceptJoin,
 				rejectJoin,
 				terminateRoom,
-				sendMessage,
+				candidate,
+				offer,
+				answer,
 			}}
 		>
 			{children}

@@ -1,8 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-	type ServerToClientHandlers,
-	SocketEvent,
-} from "@turbo-p2p-share/shared/types/socket";
+import type { ServerToClientHandlers } from "@turbo-p2p-share/shared/types/socket";
 import { ArrowUpRightFromSquareIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -30,8 +27,12 @@ import {
 	FieldGroup,
 	FieldLabel,
 } from "@/components/ui/field";
+import { UploadFile } from "@/components/upload-file";
 import { useAlertDialog } from "@/hooks/use-alert-dialog";
+import { useFileSocket } from "@/hooks/use-file-socket";
+import { useRoomSocket } from "@/hooks/use-room-socket";
 import { useSocket } from "@/hooks/use-socket";
+import { useWebRTC } from "@/hooks/use-webrtc";
 
 const formSchema = z.object({
 	myRoomId: z.string().nonempty("Room ID is required"),
@@ -43,28 +44,22 @@ const formSchema = z.object({
 
 type FormSchema = z.infer<typeof formSchema>;
 
-type ConnectedRoom = {
-	roomId: string;
-	memberIds: string[];
-};
-
 type Props = {
-	roomId?: string;
+	roomIdParam?: string;
 };
 
-export const ShareForm = ({ roomId }: Props) => {
-	const [connectedRoom, setConnectedRoom] = useState<ConnectedRoom | null>(
-		null,
-	);
+export const ShareForm = ({ roomIdParam }: Props) => {
 	const [isConnecting, setIsConnecting] = useState(false);
+	const [currentRoomId, setCurrentRoomId] = useState<string>();
 
 	const { alert } = useAlertDialog();
 	const shareSocket = useSocket();
+	const webrtc = useWebRTC();
 	const form = useForm<FormSchema>({
 		resolver: zodResolver(formSchema),
 		defaultValues: {
 			myRoomId: "",
-			partnerRoomId: roomId || "",
+			partnerRoomId: roomIdParam || "",
 		},
 	});
 
@@ -73,7 +68,140 @@ export const ShareForm = ({ roomId }: Props) => {
 		name: "partnerRoomId",
 	});
 
-	const handleError = useCallback<ServerToClientHandlers[SocketEvent.ERROR]>(
+	//#region
+	const onRoomCreated = useCallback<ServerToClientHandlers["room:create"]>(
+		({ roomId }) => {
+			form.setValue("myRoomId", roomId);
+			console.log("Room created with ID:", roomId);
+		},
+		[form],
+	);
+	const onRoomJoined = useCallback<ServerToClientHandlers["room:join"]>(
+		({ roomId }) => {
+			// setCurrentRoomId(roomId);
+			console.log("Joined room:", roomId);
+		},
+		[],
+	);
+	const onRoomRequested = useCallback<ServerToClientHandlers["room:request"]>(
+		async ({ roomId, userId }) => {
+			const accept = await alert({
+				title: "Join Request",
+				description: `User ${userId} wants to join your room.`,
+				cancel: { label: "Reject", props: { variant: "destructive" } },
+				action: { label: "Accept" },
+			});
+			if (!accept) {
+				shareSocket.rejectJoin({ roomId });
+				return;
+			}
+
+			const pc = webrtc.initSender();
+			pc.onicecandidate = (e) => {
+				if (e.candidate) {
+					shareSocket.candidate({
+						roomId,
+						candidate: e.candidate.toJSON(),
+					});
+				}
+			};
+
+			const offer = await pc.createOffer();
+			await pc.setLocalDescription(offer);
+
+			shareSocket.offer({ roomId, sdp: offer });
+			shareSocket.acceptJoin({ roomId });
+		},
+		[alert, shareSocket, webrtc.initSender],
+	);
+	const onRoomAccepted = useCallback<ServerToClientHandlers["room:accept"]>(
+		({ roomId }) => {
+			setIsConnecting(false);
+			setCurrentRoomId(roomId);
+			console.log("Room accepted, waiting for offer...");
+		},
+		[],
+	);
+	const onRoomRejected = useCallback<ServerToClientHandlers["room:reject"]>(
+		({ userId }) => {
+			setIsConnecting(false);
+			console.log(`Join request rejected by: ${userId}`);
+		},
+		[],
+	);
+	const onRoomTerminated = useCallback<
+		ServerToClientHandlers["room:terminate"]
+	>(() => {
+		webrtc.cleanup();
+		setCurrentRoomId(undefined);
+	}, [webrtc.cleanup]);
+	useRoomSocket({
+		socket: shareSocket.socket,
+		onRoomCreated,
+		onRoomJoined,
+		onRoomRequested,
+		onRoomAccepted,
+		onRoomRejected,
+		onRoomTerminated,
+	});
+	//#endregion
+
+	//#region File Socket Handlers
+	const onCandidate = useCallback<ServerToClientHandlers["file:candidate"]>(
+		async ({ candidate }) => {
+			const pc = webrtc.pcRef.current;
+			console.log("Current PC on File Candidate:", pc);
+			if (!pc) return;
+			await pc.addIceCandidate(candidate);
+			console.log("Added ICE candidate:", candidate);
+		},
+		[webrtc.pcRef],
+	);
+	const onOffered = useCallback<ServerToClientHandlers["file:offer"]>(
+		async ({ roomId, sdp }) => {
+			const pc = webrtc.initReceiver();
+
+			pc.onicecandidate = (e) => {
+				if (e.candidate) {
+					shareSocket.candidate({
+						roomId,
+						candidate: e.candidate.toJSON(),
+					});
+				}
+			};
+
+			await pc.setRemoteDescription(sdp);
+			await webrtc.flushPendingCandidates();
+
+			const answer = await pc.createAnswer();
+			await pc.setLocalDescription(answer);
+
+			shareSocket.answer({ roomId, sdp: answer });
+		},
+		[
+			shareSocket.answer,
+			webrtc.initReceiver,
+			shareSocket.candidate,
+			webrtc.flushPendingCandidates,
+		],
+	);
+	const onAnswered = useCallback<ServerToClientHandlers["file:answer"]>(
+		async ({ sdp }) => {
+			await webrtc.pcRef.current?.setRemoteDescription(sdp);
+			await webrtc.flushPendingCandidates();
+		},
+		[webrtc.pcRef.current?.setRemoteDescription, webrtc.flushPendingCandidates],
+	);
+	useFileSocket({
+		socket: shareSocket.socket,
+		onCandidate,
+		onOffered,
+		onAnswered,
+	});
+	//#endregion
+
+	//#region Error Handler
+	const onError = useCallback<ServerToClientHandlers["error"]>(
 		({ messages }) => {
 			setIsConnecting(false);
 			toast.error("Socket Error", {
@@ -89,122 +217,38 @@ export const ShareForm = ({ roomId }: Props) => {
 		},
 		[],
 	);
-
-	const handleRoomPreCreated = useCallback<
-		ServerToClientHandlers[SocketEvent.ROOM_PRE_CREATED]
-	>(
-		({ roomId }) => {
-			form.setValue("myRoomId", roomId);
-			console.log(`Room pre-created with ID: ${roomId}`);
-		},
-		[form],
-	);
-
-	const handleJoinRequested = useCallback<
-		ServerToClientHandlers[SocketEvent.ROOM_JOIN_REQUESTED]
-	>(
-		async ({ roomId, guestUserId }) => {
-			console.log(`Join request for room ${roomId} from user ${guestUserId}`);
-
-			const accept = await alert({
-				title: "Join Request",
-				description: `User ${guestUserId} wants to join your room ${roomId}. Do you accept?`,
-				cancel: {
-					label: "Reject",
-					props: { variant: "destructive" },
-				},
-				action: {
-					label: "Accept",
-				},
-			});
-
-			if (accept) shareSocket.acceptJoin(roomId);
-			else shareSocket.rejectJoin(roomId);
-		},
-		[alert, shareSocket],
-	);
-
-	const handleRoomCreated = useCallback<
-		ServerToClientHandlers[SocketEvent.ROOM_CREATED]
-	>(({ roomId, memberIds }) => {
-		setIsConnecting(false);
-		setConnectedRoom({ roomId, memberIds });
-		console.log(`Room created: ${roomId} with members ${memberIds.join(", ")}`);
-	}, []);
-
-	const handleTerminated = useCallback<
-		ServerToClientHandlers[SocketEvent.ROOM_TERMINATED]
-	>(
-		({ roomId }) => {
-			if (connectedRoom?.roomId === roomId) {
-				setConnectedRoom(null);
-				console.log(`Room terminated: ${roomId}`);
-			}
-		},
-		[connectedRoom],
-	);
-
 	useEffect(() => {
-		shareSocket.socket?.on(SocketEvent.ERROR, handleError);
-		shareSocket.socket?.on(SocketEvent.ROOM_PRE_CREATED, handleRoomPreCreated);
-		shareSocket.socket?.on(SocketEvent.ROOM_CREATED, handleRoomCreated);
-		shareSocket.socket?.on(
-			SocketEvent.ROOM_JOIN_REQUESTED,
-			handleJoinRequested,
-		);
-		shareSocket.socket?.on(SocketEvent.ROOM_JOIN_REJECTED, ({ roomId }) => {
-			setIsConnecting(false);
-			console.log(`Join request rejected for room ${roomId}`);
-		});
-		shareSocket.socket?.on(SocketEvent.ROOM_TERMINATED, handleTerminated);
-		shareSocket.socket?.on(
-			SocketEvent.ROOM_MESSAGE_RECEIVED,
-			({ senderId, message }) => {
-				console.log(`Message from ${senderId}: ${message}`);
-			},
-		);
-		shareSocket.socket?.on(
-			SocketEvent.FILE_INFO_RECEIVED,
-			({ senderId, fileName, fileSize }) => {
-				console.log(
-					`File info from ${senderId}: ${fileName} (${fileSize} bytes)`,
-				);
-			},
-		);
-
-		shareSocket.createRoom({ userId: shareSocket.userId });
-
-		return () => {
-			shareSocket.socket?.off();
-		};
+		shareSocket.createRoom({ roomId: shareSocket.randomId });
+		shareSocket.socket?.on("error", onError);
 	}, [
-		shareSocket.socket,
-		shareSocket.userId,
+		onError,
 		shareSocket.createRoom,
-		handleError,
-		handleJoinRequested,
-		handleRoomPreCreated,
-		handleRoomCreated,
-		handleTerminated,
+		shareSocket.socket?.on,
+		shareSocket.randomId,
 	]);
+	//#endregion
 
 	const handleSubmit: SubmitHandler<FormSchema> = (data) => {
 		console.log(data);
 	};
 
-	const handleJoinRequest = () => {
-		if (partnerRoomId) {
-			shareSocket.joinRequest({
-				roomId: partnerRoomId,
-				userId: shareSocket.userId,
-			});
-			setIsConnecting(true);
-		}
+	const handleRoomRequest = async () => {
+		if (!partnerRoomId) return;
+
+		setIsConnecting(true);
+
+		shareSocket.joinRoom({ roomId: partnerRoomId });
+
+		if (!shareSocket.socket?.id) return;
+		shareSocket.requestJoin({
+			roomId: partnerRoomId,
+			userId: shareSocket.socket.id,
+		});
 	};
 
-	const handleTerminate = () => {
-		if (connectedRoom) {
-			shareSocket.terminateRoom(connectedRoom.roomId);
+	const handleRoomTerminate = () => {
+		if (currentRoomId) {
+			shareSocket.terminateRoom(currentRoomId);
 		}
 	};
 
@@ -252,11 +296,11 @@ export const ShareForm = ({ roomId }: Props) => {
 									autoComplete: "off",
 								}}
 							/>
-							{connectedRoom ? (
+							{currentRoomId ? (
 								<Button
 									type="button"
 									variant="destructive"
-									onClick={handleTerminate}
+									onClick={handleRoomTerminate}
 								>
 									Terminate
 								</Button>
@@ -264,13 +308,22 @@ export const ShareForm = ({ roomId }: Props) => {
 								<Button
 									type="button"
 									disabled={isConnecting}
-									onClick={handleJoinRequest}
+									onClick={handleRoomRequest}
 								>
 									<Loader isLoading={isConnecting} />
 									Connect
 								</Button>
 							)}
 						</div>
+						<UploadFile
+							file={webrtc.file}
+							status={webrtc.status}
+							progress={webrtc.progress}
+							sendFile={webrtc.sendFile}
+							setFile={webrtc.setFile}
+							setProgress={webrtc.setProgress}
+							setStatus={webrtc.setStatus}
+						/>
 					</FieldGroup>
 				</form>
 			</CardContent>
