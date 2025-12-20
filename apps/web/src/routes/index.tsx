@@ -1,7 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { SignalingClient } from "@/lib/socket";
 import { orpc } from "@/utils/orpc";
 
 export const Route = createFileRoute("/")({
@@ -26,12 +24,6 @@ const TITLE_TEXT = `
 
 function HomeComponent() {
 	const healthCheck = useQuery(orpc.healthCheck.queryOptions());
-
-	useEffect(() => {
-		const signaling = new SignalingClient("http://localhost:3000");
-
-		signaling.register("Test Client");
-	}, []);
 
 	return (
 		<div className="container mx-auto max-w-3xl px-4 py-2">
