@@ -17,6 +17,8 @@
 		"@orpc/client": "^1.12.2",
 		"@orpc/server": "^1.12.2",
 		"@orpc/tanstack-query": "^1.12.2",
+		"@radix-ui/react-direction": "^1.1.1",
+		"@radix-ui/react-slot": "^1.2.3",
 		"@tailwindcss/vite": "^4.0.15",
 		"@tanstack/react-form": "^1.12.3",
 		"@tanstack/react-query": "^5.90.12",
@@ -40,7 +42,6 @@
 		"sonner": "^2.0.7",
 		"tailwind-merge": "^3.4.0",
 		"tw-animate-css": "^1.2.5",
-		"webrtc-adapter": "^9.0.3",
 		"zod": "^4.2.1"
 	},
 	"devDependencies": {

@@ -2,17 +2,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { ServerToClientHandlers } from "@turbo-p2p-share/shared/types/socket";
 import { ArrowUpRightFromSquareIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import {
-	Controller,
-	type SubmitHandler,
-	useForm,
-	useWatch,
-} from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import z from "zod";
 import { FormInput } from "@/components/form";
 import { InputCopy } from "@/components/input-copy";
 import Loader from "@/components/loader";
+import { ReceivedFiles } from "@/components/received-files";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -27,7 +23,7 @@ import {
 	FieldGroup,
 	FieldLabel,
 } from "@/components/ui/field";
-import { UploadFile } from "@/components/upload-file";
+import { UploadFiles } from "@/components/upload-files";
 import { useAlertDialog } from "@/hooks/use-alert-dialog";
 import { useRoomSocket } from "@/hooks/use-room-socket";
 import { useSocket } from "@/hooks/use-socket";
@@ -70,11 +66,11 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 	//#region
 	const onRoomCreated: ServerToClientHandlers["room:create"] = ({ roomId }) => {
 		form.setValue("myRoomId", roomId);
-		console.log("Room created with ID:", roomId);
+		console.log("[Socket] Room created with ID:", roomId);
 	};
 
 	const onRoomJoined: ServerToClientHandlers["room:join"] = ({ roomId }) => {
-		console.log("Joined room:", roomId);
+		console.log("[Socket] Joined room:", roomId);
 	};
 
 	const onRoomRequested: ServerToClientHandlers["room:request"] = async ({
@@ -101,14 +97,14 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 	}) => {
 		setIsConnecting(false);
 		setCurrentRoomId(roomId);
-		console.log("Room accepted, waiting for offer...");
+		console.log("[Socket] Room accepted, waiting for offer...");
 	};
 
 	const onRoomRejected: ServerToClientHandlers["room:reject"] = ({
 		userId,
 	}) => {
 		setIsConnecting(false);
-		console.log(`Join request rejected by: ${userId}`);
+		console.log(`[Socket] Join request rejected by: ${userId}`);
 	};
 
 	const onRoomTerminated: ServerToClientHandlers["room:terminate"] = () => {
@@ -140,7 +136,7 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 					</ul>
 				),
 			});
-			console.error("Socket errors:", messages);
+			console.error("[Socket] Socket errors:", messages);
 		},
 		[],
 	);
@@ -154,10 +150,6 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 		shareSocket.randomId,
 	]);
 	//#endregion
-
-	const handleSubmit: SubmitHandler<FormSchema> = (data) => {
-		console.log(data);
-	};
 
 	const handleRoomRequest = async () => {
 		if (!partnerRoomId) return;
@@ -188,7 +180,7 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 				</CardDescription>
 			</CardHeader>
 			<CardContent>
-				<form onSubmit={form.handleSubmit(handleSubmit)}>
+				<form>
 					<FieldGroup>
 						<div className="flex items-end gap-2">
 							<Controller
@@ -242,7 +234,8 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 								</Button>
 							)}
 						</div>
-						<UploadFile />
+						<UploadFiles webrtc={webrtc} />
+						<ReceivedFiles webrtc={webrtc} />
 					</FieldGroup>
 				</form>
 			</CardContent>

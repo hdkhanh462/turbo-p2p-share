@@ -10,7 +10,7 @@ interface InterServerEvents {
 }
 
 type SocketData = {
-	userId: string;
+	roomId: string;
 };
 
 export function setupSocket(server: HttpServer) {
@@ -24,7 +24,7 @@ export function setupSocket(server: HttpServer) {
 	});
 
 	io.on("connection", (socket) => {
-		console.log("Socket connected:", socket.id);
+		console.log("[Socket] Connected:", socket.id);
 
 		socket.on("room:create", ({ roomId }) => {
 			socket.join(roomId);
@@ -45,7 +45,7 @@ export function setupSocket(server: HttpServer) {
 		});
 
 		socket.on("room:reject", ({ roomId }) => {
-			// TODO: If exist => leave
+			socket.leave(roomId);
 			socket.to(roomId).emit("room:reject", { userId: socket.id });
 		});
 
@@ -66,11 +66,17 @@ export function setupSocket(server: HttpServer) {
 		});
 
 		socket.on("disconnecting", () => {
-			console.log("Socket disconnecting:", socket.id);
+			console.log("[Socket] Disconnecting:", socket.id);
+
+			socket.rooms.forEach((roomId) => {
+				if (roomId !== socket.id) {
+					socket.to(roomId).emit("room:terminate");
+				}
+			});
 		});
 
 		socket.on("disconnect", () => {
-			console.log("Socket disconnected:", socket.id);
+			console.log("[Socket] Disconnected:", socket.id);
 		});
 	});
 }

@@ -4,9 +4,3 @@ export type FileMeta = {
 	size: number;
 	mime: string;
 };
-
-export type FileState = {
-	meta: FileMeta;
-	progress: number;
-	status: "uploading" | "downloading" | "completed";
-};

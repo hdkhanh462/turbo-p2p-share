@@ -1,16 +1,14 @@
-import type { FileMeta } from "@/types/webrtc";
-
-export function triggerFileDownload(meta: FileMeta, buffer: ArrayBuffer[]) {
-	const blob = new Blob(buffer, {
-		type: meta.mime,
-	});
-
-	const url = URL.createObjectURL(blob);
+export function downloadFile(file: File) {
+	const url = URL.createObjectURL(file);
 
 	const a = document.createElement("a");
 	a.href = url;
-	a.download = meta.name;
+	a.download = file.name;
+	a.style.display = "none";
+
+	document.body.appendChild(a);
 	a.click();
 
+	document.body.removeChild(a);
 	URL.revokeObjectURL(url);
 }
