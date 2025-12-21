@@ -1,45 +1,20 @@
+import { useState } from "react";
+
 import { Button } from "@/components/ui/button";
-import type { RTCDataChannelStatus } from "@/hooks/use-webrtc";
+import type { useWebRTC } from "@/hooks/use-webrtc";
 
 type Props = {
-	file: File | null;
-	status: RTCDataChannelStatus;
-	progress: number;
-	setFile: (file: File) => void;
-	sendFile: () => void;
-	setProgress: (progress: number) => void;
-	setStatus: (status: RTCDataChannelStatus) => void;
+	webrtc: ReturnType<typeof useWebRTC>;
 };
 
-export const UploadFile = ({
-	file,
-	status,
-	progress,
-	setFile,
-	sendFile,
-	setProgress,
-	setStatus,
-}: Props) => {
+export const UploadFile = ({ webrtc }: Props) => {
+	const [file, setFile] = useState<File | null>(null);
 	return (
-		<div
-			style={{
-				border: "1px solid #ddd",
-				padding: 16,
-				width: 320,
-				borderRadius: 8,
-			}}
-		>
+		<div className="w-full space-y-4 rounded-md border p-4">
 			<h3>📤 Upload File (P2P)</h3>
 
 			<p>
-				Status:{" "}
-				<strong>
-					{status === "connected" && "🟢 Connected"}
-					{status === "connecting" && "🟡 Connecting"}
-					{status === "sending" && "📤 Sending"}
-					{status === "done" && "✅ Done"}
-					{status === "idle" && "⚪ Idle"}
-				</strong>
+				Status: <strong>{webrtc.connected ? "🟢 Connected" : "⚪ Idle"}</strong>
 			</p>
 
 			<input
@@ -47,14 +22,12 @@ export const UploadFile = ({
 				onChange={(e) => {
 					if (e.target.files?.[0]) {
 						setFile(e.target.files[0]);
-						setProgress(0);
-						if (status === "done") setStatus("connected");
 					}
 				}}
 			/>
 
 			{file && (
-				<div style={{ marginTop: 8 }}>
+				<div>
 					<p>
 						<strong>{file.name}</strong>
 					</p>
@@ -63,22 +36,16 @@ export const UploadFile = ({
 			)}
 
 			<Button
-				onClick={sendFile}
-				disabled={!file || status !== "connected"}
-				style={{
-					marginTop: 12,
-					padding: "8px 12px",
-					width: "100%",
-					cursor: status === "connected" ? "pointer" : "not-allowed",
-				}}
+				onClick={() => file && webrtc.sendFile(file)}
+				disabled={!file || !webrtc.connected}
 			>
 				Send File
 			</Button>
 
-			{status === "sending" && (
-				<div style={{ marginTop: 12 }}>
-					<progress value={progress} max={100} />
-					<span> {progress}%</span>
+			{webrtc.incomingFile?.progress && (
+				<div>
+					<progress value={webrtc.incomingFile.progress} max={100} />
+					<span> {webrtc.incomingFile.progress}%</span>
 				</div>
 			)}
 		</div>

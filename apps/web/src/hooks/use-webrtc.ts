@@ -1,173 +1,200 @@
-import { useRef, useState } from "react";
+import { nanoid } from "nanoid";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import type { SocketTyped } from "@/hooks/use-socket";
+import type { FileMeta, FileState } from "@/types/webrtc";
+import { triggerFileDownload } from "@/utils/download";
 
 const CHUNK_SIZE = 16 * 1024; // 16KB
 
-export type RTCDataChannelStatus =
-	| "idle"
-	| "connecting"
-	| "connected"
-	| "sending"
-	| "done";
+export type SignalPayload =
+	| {
+			type: "meta";
+			meta: FileMeta;
+	  }
+	| {
+			type: "buffer";
+			buffer: ArrayBuffer;
+			progress: number;
+	  }
+	| {
+			type: "completed";
+	  };
 
-export const useWebRTC = () => {
+type Props = {
+	socket: SocketTyped | null;
+};
+
+export const useWebRTC = ({ socket }: Props) => {
 	const pcRef = useRef<RTCPeerConnection | null>(null);
-	const dataChannelRef = useRef<RTCDataChannel | null>(null);
-	const receivedBuffersRef = useRef<ArrayBuffer[]>([]);
-	const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
-	const receivedMetaRef = useRef<{
-		name: string;
-		mime: string;
-	} | null>(null);
-	const [file, setFile] = useState<File | null>(null);
-	const [progress, setProgress] = useState(0);
-	const [status, setStatus] = useState<RTCDataChannelStatus>("idle");
+	const channelRef = useRef<RTCDataChannel | null>(null);
 
-	const initReceiver = () => {
-		cleanup();
+	const incomingMeta = useRef<FileMeta | null>(null);
+	const incomingChunks = useRef<ArrayBuffer[]>([]);
 
-		const pc = new RTCPeerConnection();
-		pcRef.current = pc;
-		setStatus("connecting");
+	const [roomId, setRoomId] = useState<string | null>(null);
+	const [connected, setConnected] = useState(false);
+	const [incomingFile, setIncomingFile] = useState<FileState | null>(null);
+	const [outgoingFile, setOutgoingFile] = useState<FileState | null>(null);
 
-		pc.ondatachannel = (event) => {
-			const channel = event.channel;
-			channel.binaryType = "arraybuffer";
+	const setupDataChannel = useCallback((channel: RTCDataChannel) => {
+		channel.binaryType = "arraybuffer";
+		channelRef.current = channel;
 
-			channel.onmessage = (e) => {
-				if (typeof e.data === "string") {
-					const msg = JSON.parse(e.data);
+		channel.onmessage = (e) => {
+			if (typeof e.data === "string") {
+				const msg: SignalPayload = JSON.parse(e.data);
 
-					if (msg.type === "meta") {
-						receivedMetaRef.current = {
-							name: msg.name,
-							mime: msg.mime || "application/octet-stream",
-						};
-						return;
-					}
+				if (msg.type === "meta") {
+					incomingMeta.current = msg.meta;
+					incomingChunks.current = [];
 
-					if (msg.type === "done" && receivedMetaRef.current) {
-						console.log("DONE:", receivedMetaRef.current);
-						const blob = new Blob(receivedBuffersRef.current, {
-							type: receivedMetaRef.current.mime,
-						});
+					setIncomingFile({
+						meta: msg.meta,
+						progress: 0,
+						status: "downloading",
+					});
+					return;
+				}
 
-						const url = URL.createObjectURL(blob);
+				if (msg.type === "completed" && incomingMeta.current) {
+					setIncomingFile((prev) =>
+						prev ? { ...prev, progress: 0, status: "completed" } : null,
+					);
 
-						const a = document.createElement("a");
-						a.href = url;
-						a.download = receivedMetaRef.current.name;
-						a.click();
+					// Cleanup
+					// incomingChunks.current = [];
+					// incomingMeta.current = null;
+				}
+			} else {
+				incomingChunks.current.push(e.data);
+				const receivedSize = incomingChunks.current.reduce(
+					(acc, c) => acc + c.byteLength,
+					0,
+				);
+				if (!incomingMeta.current) return;
 
-						URL.revokeObjectURL(url);
+				const progress = Math.floor(
+					(receivedSize / incomingMeta.current.size) * 100,
+				);
 
-						receivedBuffersRef.current = [];
-						receivedMetaRef.current = null;
-						setStatus("done");
-					}
-				} else {
-					receivedBuffersRef.current.push(e.data);
+				setIncomingFile((prev) => (prev ? { ...prev, progress } : null));
+			}
+		};
+	}, []);
+
+	const createPeerConnection = useCallback(
+		(roomId: string) => {
+			const pc = new RTCPeerConnection({ iceServers: [] });
+
+			pc.onicecandidate = (e) => {
+				if (e.candidate) {
+					socket?.emit("file:candidate", { roomId, candidate: e.candidate });
 				}
 			};
 
-			setStatus("connected");
+			pc.onconnectionstatechange = () => {
+				setConnected(pc.connectionState === "connected");
+			};
+
+			pc.ondatachannel = (e) => {
+				setupDataChannel(e.channel);
+			};
+
+			pcRef.current = pc;
+			return pc;
+		},
+		[socket, setupDataChannel],
+	);
+
+	useEffect(() => {
+		socket?.on("file:offer", async ({ roomId, sdp }) => {
+			const pc = createPeerConnection(roomId);
+			await pc.setRemoteDescription(sdp);
+
+			const answer = await pc.createAnswer();
+			await pc.setLocalDescription(answer);
+
+			socket.emit("file:answer", { roomId, sdp: answer });
+		});
+
+		socket?.on("file:answer", async ({ sdp }) => {
+			await pcRef.current?.setRemoteDescription(sdp);
+		});
+
+		socket?.on("file:candidate", async ({ candidate }) => {
+			await pcRef.current?.addIceCandidate(candidate);
+		});
+
+		return () => {
+			socket?.off();
 		};
+	}, [createPeerConnection, socket]);
 
-		return pc;
+	const onReady = async (roomId: string) => {
+		setRoomId(roomId);
+		const pc = createPeerConnection(roomId);
+
+		const channel = pc.createDataChannel("file");
+		setupDataChannel(channel);
+
+		const offer = await pc.createOffer();
+		await pc.setLocalDescription(offer);
+
+		socket?.emit("file:offer", { roomId, sdp: offer });
 	};
 
-	const initSender = () => {
-		const pc = new RTCPeerConnection({ iceServers: [] });
-		pcRef.current = pc;
+	const sendFile = async (file: File) => {
+		if (!channelRef.current) return;
 
-		const dc = pc.createDataChannel("file");
-		dataChannelRef.current = dc;
-		dc.binaryType = "arraybuffer";
-
-		dc.onopen = () => setStatus("connected");
-		dc.onclose = () => setStatus("idle");
-
-		return pc;
-	};
-
-	const sendFile = async () => {
-		if (!file || !dataChannelRef.current) return;
-
-		setStatus("sending");
-		setProgress(0);
-
-		dataChannelRef.current.send(
-			JSON.stringify({
-				type: "meta",
+		const payload: SignalPayload = {
+			type: "meta",
+			meta: {
+				id: `room_${nanoid(10)}`,
 				name: file.name,
-				mime: file.type,
 				size: file.size,
-			}),
-		);
+				mime: file.type,
+			},
+		};
+		channelRef.current.send(JSON.stringify(payload));
+		setOutgoingFile({ meta: payload.meta, progress: 0, status: "uploading" });
 
 		let offset = 0;
-
 		while (offset < file.size) {
-			const slice = file.slice(offset, offset + CHUNK_SIZE);
-			const buffer = await slice.arrayBuffer();
-			dataChannelRef.current.send(buffer);
+			const chunk = await file.slice(offset, offset + CHUNK_SIZE).arrayBuffer();
+			channelRef.current.send(chunk);
 
-			offset += CHUNK_SIZE;
-			setProgress(Math.round((offset / file.size) * 100));
+			offset += chunk.byteLength;
+			const progress = Math.round((offset / file.size) * 100);
+			setOutgoingFile((prev) => (prev ? { ...prev, progress } : null));
 
-			while (dataChannelRef.current.bufferedAmount > 1_000_000) {
+			while (channelRef.current.bufferedAmount > 1_000_000) {
 				await new Promise((r) => setTimeout(r, 10));
 			}
 		}
 
-		dataChannelRef.current.send(JSON.stringify({ type: "done" }));
-		setStatus("done");
+		channelRef.current.send(JSON.stringify({ type: "completed" }));
 	};
 
-	const addIceCandidateSafe = async (candidate: RTCIceCandidateInit) => {
-		const pc = pcRef.current;
-		if (!pc) return;
-
-		if (pc.remoteDescription) {
-			await pc.addIceCandidate(candidate);
-		} else {
-			pendingCandidatesRef.current.push(candidate);
-		}
-	};
-
-	const flushPendingCandidates = async () => {
-		const pc = pcRef.current;
-		if (!pc) return;
-
-		for (const c of pendingCandidatesRef.current) {
-			await pc.addIceCandidate(c);
-		}
-		pendingCandidatesRef.current = [];
+	const downloadFile = () => {
+		if (!incomingMeta.current || incomingChunks.current.length === 0) return;
+		triggerFileDownload(incomingMeta.current, incomingChunks.current);
 	};
 
 	const cleanup = () => {
-		dataChannelRef.current?.close();
 		pcRef.current?.close();
-		dataChannelRef.current = null;
 		pcRef.current = null;
-		receivedBuffersRef.current = [];
-		setProgress(0);
-		setStatus("idle");
+		channelRef.current?.close();
 	};
 
 	return {
-		file,
-		status,
-		progress,
-		pcRef,
-		dataChannelRef,
-		setStatus,
-		initSender,
-		initReceiver,
-		sendFile,
-		setFile,
-		setProgress,
+		roomId,
+		connected,
+		incomingFile,
+		outgoingFile,
+		onReady,
 		cleanup,
-		addIceCandidateSafe,
-		flushPendingCandidates,
+		sendFile,
+		downloadFile,
 	};
 };
