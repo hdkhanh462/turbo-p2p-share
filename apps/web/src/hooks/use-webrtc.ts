@@ -1,67 +1,45 @@
 import { nanoid } from "nanoid";
-import {
-	type Dispatch,
-	type SetStateAction,
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { SocketTyped } from "@/hooks/use-socket";
-import type { FileMeta } from "@/types/webrtc";
+import type { SignalPayload, TransferData } from "@/types/webrtc";
 
 const CHUNK_SIZE = 16 * 1024; // 16KB
 
-export type SignalPayload =
-	| {
-			type: "meta";
-			meta: FileMeta;
-	  }
-	| {
-			type: "canceled";
-			id: string;
-	  }
-	| {
-			type: "completed";
-			id: string;
-	  };
-
-export type TransferFile = {
-	id: string;
-	file?: File;
-	progress: number;
-	direction: "sent" | "received";
-	status: "sending" | "receiving" | "completed" | "failed";
-};
-
-export type UseWebRTCRetun = {
-	connected: boolean;
-	roomId: string | null;
-	sentFiles: TransferFile[];
-	receivedFiles: TransferFile[];
-	cleanup: () => void;
-	onReady: (roomId: string) => Promise<void>;
-	sendFile: (file: File) => Promise<void>;
-	setSentFiles: Dispatch<SetStateAction<TransferFile[]>>;
-	setReceivedFiles: Dispatch<SetStateAction<TransferFile[]>>;
+type IncomingData = {
+	chunks: ArrayBuffer[];
+	data: TransferData | null;
 };
 
 type Props = {
 	socket: SocketTyped | null;
 };
 
-export const useWebRTC = ({ socket }: Props): UseWebRTCRetun => {
+export const useWebRTC = ({ socket }: Props) => {
 	const pcRef = useRef<RTCPeerConnection | null>(null);
 	const channelRef = useRef<RTCDataChannel | null>(null);
 
-	const incomingMeta = useRef<FileMeta | null>(null);
-	const incomingChunks = useRef<ArrayBuffer[]>([]);
+	const incomingData = useRef<IncomingData>({ chunks: [], data: null });
+	const abortControllers = useRef<Map<string, AbortController>>(new Map());
 
 	const [roomId, setRoomId] = useState<string | null>(null);
 	const [connected, setConnected] = useState(false);
-	const [sentFiles, setSentFiles] = useState<TransferFile[]>([]);
-	const [receivedFiles, setReceivedFiles] = useState<TransferFile[]>([]);
+	const [sentFiles, setSentFiles] = useState<TransferData[]>([]);
+	const [receivedFiles, setReceivedFiles] = useState<TransferData[]>([]);
+
+	const modifyFileStatus = useCallback(
+		(id: string, type: "sent" | "received", data: Partial<TransferData>) => {
+			if (type === "sent")
+				setSentFiles((prev) =>
+					prev.map((f) => (f.id === id ? { ...f, ...data } : f)),
+				);
+			else
+				setReceivedFiles((prev) =>
+					prev.map((f) => (f.id === id ? { ...f, ...data } : f)),
+				);
+		},
+		[],
+	);
 
 	const setupDataChannel = useCallback(
 		(channel: RTCDataChannel) => {
@@ -73,77 +51,80 @@ export const useWebRTC = ({ socket }: Props): UseWebRTCRetun => {
 			channel.onmessage = (e) => {
 				if (typeof e.data === "string") {
 					const msg: SignalPayload = JSON.parse(e.data);
-					console.debug("[WebRTC] Signal received:", msg.type);
 
 					if (msg.type === "meta") {
-						incomingMeta.current = msg.meta;
-						incomingChunks.current = [];
-
-						const receivedFile: TransferFile = {
-							id: msg.meta.id,
-							direction: "received",
-							status: "receiving",
-							progress: 0,
-						};
-						setReceivedFiles((prev) => [...prev, receivedFile]);
+						console.log(
+							`[WebRTC] Incoming file ${msg.data.id}:`,
+							msg.data.meta.name,
+						);
+						incomingData.current = { chunks: [], data: msg.data };
+						const receivedData = msg.data;
+						setReceivedFiles((prev) => [
+							...prev,
+							{ ...receivedData, status: "receiving" },
+						]);
 
 						return;
 					}
 
 					// End of transfer (completed or canceled)
-					if (
-						incomingMeta.current &&
-						(msg.type === "canceled" || msg.type === "completed")
-					) {
-						console.info(`[WebRTC] Transfer ${msg.id} finished:`, msg.type);
-						const meta = incomingMeta.current;
+					if (msg.type === "canceled" || msg.type === "completed") {
+						if (msg.type === "canceled") {
+							// On sender side
+							if (msg.by === "receiver") {
+								console.log("[WebRTC] Receiver canceled the transfer:", msg.id);
+								const controller = abortControllers.current.get(msg.id);
+								if (controller) {
+									controller.abort();
+									modifyFileStatus(msg.id, "sent", { status: "canceled" });
+								}
+							}
 
-						setReceivedFiles((prev) =>
-							prev.map((f) => (f.id === meta.id ? { ...f, progress: 0 } : f)),
-						);
-
-						if (msg.type === "completed") {
-							console.info(
-								`[WebRTC] Transfer ${incomingMeta.current.id} completed:`,
-								incomingMeta.current.name,
-							);
-							const file = new File(
-								incomingChunks.current,
-								incomingMeta.current.name,
-								{ type: incomingMeta.current.mime },
-							);
-
-							setReceivedFiles((prev) =>
-								prev.map((f) =>
-									f.id === meta.id
-										? { ...f, status: "completed", progress: 100, file }
-										: f,
-								),
-							);
+							// On receiver side
+							if (msg.by === "sender") {
+								console.log("[WebRTC] Sender canceled the transfer:", msg.id);
+								setReceivedFiles((prev) => prev.filter((f) => f.id !== msg.id));
+							}
 						}
 
-						// Reset buffers
-						incomingChunks.current = [];
-						incomingMeta.current = null;
+						if (!incomingData.current.data) return;
+						const data = incomingData.current.data;
+
+						if (msg.type === "completed") {
+							const file = new File(
+								incomingData.current.chunks,
+								data.meta.name,
+								{
+									type: data.meta.mime,
+								},
+							);
+							modifyFileStatus(data.id, "received", {
+								status: "completed",
+								progress: 100,
+								file,
+							});
+						}
+
+						// Reset incoming data
+						if (msg.id === data.id) {
+							incomingData.current = { chunks: [], data: null };
+						}
 					}
 				} else {
-					// ---- Binary chunks
-					incomingChunks.current.push(e.data);
-					const receivedSize = incomingChunks.current.reduce(
+					// === Handle incoming file chunk ===
+					if (!incomingData.current.data) return;
+					incomingData.current.chunks.push(e.data);
+					const receivedSize = incomingData.current.chunks.reduce(
 						(acc, c) => acc + c.byteLength,
 						0,
 					);
-					if (!incomingMeta.current) return;
-					const meta = incomingMeta.current;
-					const progress = Math.floor((receivedSize / meta.size) * 100);
-
-					setReceivedFiles((prev) =>
-						prev.map((f) => (f.id === meta.id ? { ...f, progress } : f)),
-					);
+					const data = incomingData.current.data;
+					const progress = Math.floor((receivedSize / data.meta.size) * 100);
+					modifyFileStatus(data.id, "received", { progress });
 				}
 			};
 		},
-		[roomId],
+		[roomId, modifyFileStatus],
 	);
 
 	const createPeerConnection = useCallback(
@@ -206,10 +187,6 @@ export const useWebRTC = ({ socket }: Props): UseWebRTCRetun => {
 		};
 	}, [createPeerConnection, socket]);
 
-	const sendSignal = <T extends SignalPayload>(payload: T) => {
-		channelRef.current?.send(JSON.stringify(payload));
-	};
-
 	const onReady = async (roomId: string) => {
 		console.info("[WebRTC] Ready, creating offer:", roomId);
 
@@ -228,6 +205,10 @@ export const useWebRTC = ({ socket }: Props): UseWebRTCRetun => {
 		socket?.emit("file:offer", { roomId, sdp: offer });
 	};
 
+	const sendSignal = (payload: SignalPayload) => {
+		channelRef.current?.send(JSON.stringify(payload));
+	};
+
 	const sendFile = async (file: File) => {
 		if (!channelRef.current) {
 			console.warn("[WebRTC] No DataChannel – cannot send file");
@@ -236,52 +217,81 @@ export const useWebRTC = ({ socket }: Props): UseWebRTCRetun => {
 
 		const payload: SignalPayload = {
 			type: "meta",
-			meta: {
-				id: `file_${nanoid(10)}`,
-				name: file.name,
-				size: file.size,
-				mime: file.type,
+			data: {
+				id: `file_${nanoid()}`,
+				status: "sending",
+				progress: 0,
+				meta: {
+					name: file.name,
+					size: file.size,
+					mime: file.type,
+				},
 			},
 		};
-		const sentFile: TransferFile = {
-			id: payload.meta.id,
-			direction: "sent",
-			status: "sending",
-			progress: 0,
-			file,
-		};
+		const controller = new AbortController();
+		abortControllers.current.set(payload.data.id, controller);
 
-		setSentFiles((prev) => [...prev, sentFile]);
+		setSentFiles((prev) => [...prev, { ...payload.data, file }]);
 		sendSignal(payload);
 
 		console.info(
-			`[WebRTC] Sending file ${payload.meta.id}:`,
-			payload.meta.name,
+			`[WebRTC] Sending file ${payload.data.id}:`,
+			payload.data.meta.name,
 		);
 
 		let offset = 0;
-		while (offset < file.size) {
-			const chunk = await file.slice(offset, offset + CHUNK_SIZE).arrayBuffer();
-			channelRef.current.send(chunk);
+		try {
+			while (offset < file.size) {
+				if (controller.signal.aborted) {
+					throw new DOMException("Canceled", "AbortError");
+				}
+				const chunk = await file
+					.slice(offset, offset + CHUNK_SIZE)
+					.arrayBuffer();
+				channelRef.current.send(chunk);
 
-			offset += chunk.byteLength;
-			const progress = Math.round((offset / file.size) * 100);
-			setSentFiles((prev) =>
-				prev.map((f) => (f.id === sentFile.id ? { ...f, progress } : f)),
-			);
+				offset += chunk.byteLength;
+				const progress = Math.round((offset / file.size) * 100);
+				modifyFileStatus(payload.data.id, "sent", { progress });
 
-			while (channelRef.current.bufferedAmount > 1_000_000) {
-				await new Promise((r) => setTimeout(r, 10));
+				// Throttle if buffered amount is too high
+				while (channelRef.current.bufferedAmount > 1_000_000) {
+					await new Promise((r) => setTimeout(r, 10));
+				}
 			}
-		}
 
-		setSentFiles((prev) =>
-			prev.map((f) =>
-				f.id === sentFile.id ? { ...f, status: "completed", progress: 100 } : f,
-			),
-		);
-		sendSignal({ type: "completed", id: payload.meta.id });
-		console.info(`[WebRTC] File ${payload.meta.id} sent completed`);
+			sendSignal({ type: "completed", id: payload.data.id });
+			modifyFileStatus(payload.data.id, "sent", {
+				status: "completed",
+				progress: 100,
+			});
+			console.info(`[WebRTC] File ${payload.data.id} sent completed`);
+		} catch (error) {
+			if (error instanceof DOMException && error.name === "AbortError") {
+				console.info(`[WebRTC] File ${payload.data.id} sending canceled`);
+				return;
+			}
+			console.log("[WebRTC] Error sending file:", error);
+			modifyFileStatus(payload.data.id, "sent", { status: "failed" });
+			// TODO: handle other errors
+		} finally {
+			abortControllers.current.delete(payload.data.id);
+		}
+	};
+
+	const cancelSendFile = (id: string, by: "sender" | "receiver") => {
+		if (by === "sender") {
+			const controller = abortControllers.current.get(id);
+			if (controller) {
+				controller.abort();
+				modifyFileStatus(id, "sent", { status: "canceled" });
+				sendSignal({ type: "canceled", id, by });
+			}
+		} else if (by === "receiver" && incomingData.current.data?.id === id) {
+			sendSignal({ type: "canceled", id, by: "receiver" });
+			setReceivedFiles((prev) => prev.filter((f) => f.id !== id));
+			incomingData.current = { chunks: [], data: null };
+		}
 	};
 
 	const cleanup = () => {
@@ -292,8 +302,8 @@ export const useWebRTC = ({ socket }: Props): UseWebRTCRetun => {
 
 		pcRef.current = null;
 		channelRef.current = null;
-		incomingMeta.current = null;
-		incomingChunks.current = [];
+		abortControllers.current.clear();
+		incomingData.current = { chunks: [], data: null };
 
 		setSentFiles([]);
 		setReceivedFiles([]);
@@ -309,6 +319,7 @@ export const useWebRTC = ({ socket }: Props): UseWebRTCRetun => {
 		onReady,
 		cleanup,
 		sendFile,
+		cancelSendFile,
 		setSentFiles,
 		setReceivedFiles,
 	};

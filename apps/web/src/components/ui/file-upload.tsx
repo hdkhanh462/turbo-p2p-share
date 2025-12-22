@@ -34,9 +34,8 @@ export function formatBytes(bytes: number) {
   return `${(bytes / 1024 ** i).toFixed(i ? 1 : 0)} ${sizes[i]}`;
 }
 
-export function getFileIcon(file: File) {
-  const type = file.type;
-  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+export function getFileIcon({type, name}: { type: string; name: string }) {
+  const extension = name.split(".").pop()?.toLowerCase() ?? "";
 
   if (type.startsWith("video/")) {
     return <FileVideoIcon />;

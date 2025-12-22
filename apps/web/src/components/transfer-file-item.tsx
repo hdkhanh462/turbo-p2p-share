@@ -1,25 +1,23 @@
 import * as React from "react";
 import { FileItemProgress } from "@/components/file-download-item-progress";
 import { formatBytes, getFileIcon } from "@/components/ui/file-upload";
-import type { TransferFile } from "@/hooks/use-webrtc";
+import type { TransferData } from "@/types/webrtc";
 
 type Props = {
-	file: File;
-	data: TransferFile;
+	data: TransferData;
 	action?: React.ReactNode;
 };
 
-export function TransferFileItem({ file, data, action }: Props) {
+export function TransferFileItem({ data, action }: Props) {
 	const previewUrl = React.useMemo(() => {
-		if (file.type.startsWith("image/")) {
-			return URL.createObjectURL(file);
-		}
-		return null;
-	}, [file]);
+		return data.file?.type.startsWith("image/")
+			? URL.createObjectURL(data.file)
+			: null;
+	}, [data.file]);
 
 	React.useEffect(() => {
 		return () => {
-			if (previewUrl) URL.revokeObjectURL(previewUrl);
+			previewUrl && URL.revokeObjectURL(previewUrl);
 		};
 	}, [previewUrl]);
 
@@ -32,19 +30,19 @@ export function TransferFileItem({ file, data, action }: Props) {
 					{previewUrl ? (
 						<img
 							src={previewUrl}
-							alt={file.name}
+							alt={data.meta.name}
 							className="size-full object-cover"
 						/>
 					) : (
-						getFileIcon(file)
+						getFileIcon({ type: data.meta.mime, name: data.meta.name })
 					)}
 				</div>
 
 				{/* Metadata */}
 				<div className="flex min-w-0 flex-1 flex-col">
-					<span className="truncate font-medium text-sm">{file.name}</span>
+					<span className="truncate font-medium text-sm">{data.meta.name}</span>
 					<span className="truncate text-muted-foreground text-xs">
-						{formatBytes(file.size)}
+						{formatBytes(data.meta.size)}
 					</span>
 				</div>
 
@@ -53,7 +51,7 @@ export function TransferFileItem({ file, data, action }: Props) {
 			</div>
 
 			{/* Progress */}
-			{data.status === "sending" && (
+			{(data.status === "sending" || data.status === "receiving") && (
 				<FileItemProgress progress={data.progress} />
 			)}
 		</div>

@@ -1,4 +1,4 @@
-import { DownloadIcon, InboxIcon, XIcon } from "lucide-react";
+import { BanIcon, DownloadIcon, InboxIcon, XIcon } from "lucide-react";
 import { FileList } from "@/components/file-list";
 import { TransferFileItem } from "@/components/transfer-file-item";
 import { Button } from "@/components/ui/button";
@@ -9,15 +9,15 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Field, FieldLabel } from "@/components/ui/field";
-import type { UseWebRTCRetun } from "@/hooks/use-webrtc";
+import type { useWebRTC } from "@/hooks/use-webrtc";
 import { downloadFile } from "@/utils/download";
 
 type Props = {
-	webrtc: UseWebRTCRetun;
+	webrtc: ReturnType<typeof useWebRTC>;
 };
 
 export const ReceivedFiles = ({
-	webrtc: { receivedFiles, setReceivedFiles },
+	webrtc: { receivedFiles, setReceivedFiles, cancelSendFile },
 }: Props) => {
 	const removeReceivedFiles = (id: string) => {
 		setReceivedFiles((prev) => prev.filter((f) => f.id !== id));
@@ -28,36 +28,46 @@ export const ReceivedFiles = ({
 			<FieldLabel>Received Files</FieldLabel>
 
 			<FileList empty={<ReceivedFilesEmpty />}>
-				{receivedFiles.map(
-					(data) =>
-						data.file && (
-							<TransferFileItem
-								key={data.id}
-								file={data.file}
-								data={data}
-								action={
-									<>
-										<Button
-											variant="ghost"
-											size="icon"
-											className="size-7"
-											onClick={() => data.file && downloadFile(data.file)}
-										>
-											<DownloadIcon />
-										</Button>
-										<Button
-											variant="ghost"
-											size="icon"
-											className="size-7"
-											onClick={() => removeReceivedFiles(data.id)}
-										>
-											<XIcon />
-										</Button>
-									</>
-								}
-							/>
-						),
-				)}
+				{receivedFiles.map((data) => (
+					<TransferFileItem
+						key={data.id}
+						data={data}
+						action={
+							<>
+								{data.status === "completed" && (
+									<Button
+										variant="ghost"
+										size="icon"
+										className="size-7"
+										onClick={() => data.file && downloadFile(data.file)}
+									>
+										<DownloadIcon />
+									</Button>
+								)}
+								{data.status === "receiving" && (
+									<Button
+										variant="ghost"
+										size="icon"
+										className="size-7"
+										onClick={() => cancelSendFile(data.id, "receiver")}
+									>
+										<BanIcon />
+									</Button>
+								)}
+								{data.status !== "receiving" && (
+									<Button
+										variant="ghost"
+										size="icon"
+										className="size-7"
+										onClick={() => removeReceivedFiles(data.id)}
+									>
+										<XIcon />
+									</Button>
+								)}
+							</>
+						}
+					/>
+				))}
 			</FileList>
 		</Field>
 	);
