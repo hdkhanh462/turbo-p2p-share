@@ -62,7 +62,7 @@ app.get("/", (_req, res) => {
 });
 
 const port = process.env.PORT || 3000;
-const server = createServer(app);
+const server = createServer();
 
 setupSocket(server);
 

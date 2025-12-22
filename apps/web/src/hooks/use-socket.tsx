@@ -53,6 +53,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
 	useEffect(() => {
 		const socket = io(import.meta.env.VITE_SERVER_URL, {
 			transports: ["websocket"],
+			secure: false,
 		}) as SocketTyped;
 
 		socketRef.current = socket;

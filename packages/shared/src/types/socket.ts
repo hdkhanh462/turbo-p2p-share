@@ -4,7 +4,7 @@ export type ServerToClientHandlers = {
 	"room:join": (payload: { roomId: string }) => void;
 	"room:request": (payload: { roomId: string; userId: string }) => void;
 	"room:accept": (payload: { roomId: string }) => void;
-	"room:reject": (payload: { userId: string }) => void;
+	"room:reject": (payload: { roomId: string; userId: string }) => void;
 	"room:terminate": () => void;
 	"file:offer": (payload: {
 		roomId: string;
@@ -19,7 +19,7 @@ export interface ClientToServerHandlers {
 	"room:join": (payload: { roomId: string }) => void;
 	"room:request": (payload: { roomId: string; userId: string }) => void;
 	"room:accept": (payload: { roomId: string }) => void;
-	"room:reject": (payload: { roomId: string }) => void;
+	"room:reject": (payload: { roomId: string; userId: string }) => void;
 	"room:terminate": (roomId: string) => void;
 	"file:offer": (payload: {
 		roomId: string;

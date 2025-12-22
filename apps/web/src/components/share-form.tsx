@@ -5,8 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import z from "zod";
-import { FormInput } from "@/components/form";
-import { InputCopy } from "@/components/input-copy";
+import { InputCopyPaste } from "@/components/input-copy-paste";
 import Loader from "@/components/loader";
 import { ReceivedFiles } from "@/components/received-files";
 import { Button } from "@/components/ui/button";
@@ -84,7 +83,8 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 			action: { label: "Accept" },
 		});
 		if (!accept) {
-			shareSocket.rejectJoin({ roomId });
+			shareSocket.rejectJoin({ roomId, userId });
+			console.log("[Socket] Rejected join request from:", userId);
 			return;
 		}
 
@@ -101,10 +101,11 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 	};
 
 	const onRoomRejected: ServerToClientHandlers["room:reject"] = ({
+		roomId,
 		userId,
 	}) => {
 		setIsConnecting(false);
-		console.log(`[Socket] Join request rejected by: ${userId}`);
+		console.log(`[Socket] Join request to ${roomId} rejected by: ${userId}`);
 	};
 
 	const onRoomTerminated: ServerToClientHandlers["room:terminate"] = () => {
@@ -189,7 +190,7 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 								render={({ field, fieldState }) => (
 									<Field data-invalid={fieldState.invalid}>
 										<FieldLabel>My Room ID</FieldLabel>
-										<InputCopy
+										<InputCopyPaste
 											{...field}
 											aria-invalid={fieldState.invalid}
 											placeholder="Your Room ID"
@@ -206,14 +207,26 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 							</Button>
 						</div>
 						<div className="flex items-end gap-2">
-							<FormInput
-								control={form.control}
+							<Controller
 								name="partnerRoomId"
-								label="Partner Room ID"
-								inputProps={{
-									placeholder: "Enter Partner Room ID",
-									autoComplete: "off",
-								}}
+								control={form.control}
+								render={({ field, fieldState }) => (
+									<Field data-invalid={fieldState.invalid}>
+										<FieldLabel>Partner's Room ID</FieldLabel>
+										<InputCopyPaste
+											{...field}
+											aria-invalid={fieldState.invalid}
+											placeholder="Enter Partner Room ID"
+											autoComplete="off"
+											showCopy={false}
+											showPaste
+											showClear
+										/>
+										{fieldState.invalid && (
+											<FieldError errors={[fieldState.error]} />
+										)}
+									</Field>
+								)}
 							/>
 							{currentRoomId ? (
 								<Button

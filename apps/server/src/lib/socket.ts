@@ -27,6 +27,7 @@ export function setupSocket(server: HttpServer) {
 		console.log("[Socket] Connected:", socket.id);
 
 		socket.on("room:create", ({ roomId }) => {
+			socket.data.roomId = roomId;
 			socket.join(roomId);
 			socket.emit("room:create", { roomId });
 		});
@@ -44,13 +45,17 @@ export function setupSocket(server: HttpServer) {
 			io.to(payload.roomId).emit("room:accept", payload);
 		});
 
-		socket.on("room:reject", ({ roomId }) => {
-			socket.leave(roomId);
-			socket.to(roomId).emit("room:reject", { userId: socket.id });
+		socket.on("room:reject", ({ roomId, userId }) => {
+			const targetSocket = io.sockets.sockets.get(userId);
+			if (targetSocket) {
+				targetSocket.leave(roomId);
+			}
+			socket.to(userId).emit("room:reject", { roomId, userId: socket.id });
 		});
 
 		socket.on("room:terminate", (roomId) => {
 			io.to(roomId).emit("room:terminate");
+			if (roomId !== socket.data.roomId) socket.leave(roomId);
 		});
 
 		socket.on("file:offer", (payload) => {
