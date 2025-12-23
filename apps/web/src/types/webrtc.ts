@@ -13,6 +13,25 @@ export type SignalPayload =
 			id: string;
 	  };
 
+export type ChannelMessage =
+	| {
+			type: "META";
+			id: string;
+			meta: FileMeta;
+	  }
+	| {
+			type: "CANCEL";
+			id: string;
+	  }
+	| {
+			type: "EOF";
+			id: string;
+	  }
+	| {
+			type: "ACK";
+			id: string;
+	  };
+
 export type FileMeta = {
 	name: string;
 	size: number;
