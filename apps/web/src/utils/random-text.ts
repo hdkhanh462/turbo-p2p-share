@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
 
-type RandomIdOptions = {
+type RandomTextOptions = {
 	length?: number;
 	prefix?: string;
 };
@@ -9,7 +9,7 @@ const DEFAULT_OPTIONS = {
 	length: 10,
 };
 
-export function randomId(options?: RandomIdOptions) {
+export function randomText(options?: RandomTextOptions) {
 	const opts = { ...DEFAULT_OPTIONS, ...options };
 	return `${opts.prefix}_${nanoid(opts.length)}`;
 }

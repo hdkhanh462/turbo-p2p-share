@@ -1,13 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { ServerToClientHandlers } from "@turbo-p2p-share/shared/types/socket";
 import { ArrowUpRightFromSquareIcon } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { toast } from "sonner";
 import z from "zod";
+
 import { InputCopyPaste } from "@/components/input-copy-paste";
 import Loader from "@/components/loader";
-import { ReceivedFiles } from "@/components/received-files";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -22,11 +19,9 @@ import {
 	FieldGroup,
 	FieldLabel,
 } from "@/components/ui/field";
-import { UploadFiles } from "@/components/upload-files";
-import { useAlertDialog } from "@/hooks/use-alert-dialog";
+import { useP2PSharing } from "@/hooks/use-p2p-sharing";
 import { useRoomSocket } from "@/hooks/use-room-socket";
 import { useSocket } from "@/hooks/use-socket";
-import { useWebRTC } from "@/hooks/use-webrtc";
 
 const formSchema = z.object({
 	myRoomId: z.string().nonempty("Room ID is required"),
@@ -43,12 +38,9 @@ type Props = {
 };
 
 export const ShareForm = ({ roomIdParam }: Props) => {
-	const [isConnecting, setIsConnecting] = useState(false);
-	const [currentRoomId, setCurrentRoomId] = useState<string>();
-
-	const { alert } = useAlertDialog();
 	const shareSocket = useSocket();
-	const webrtc = useWebRTC({ socket: shareSocket.socket });
+	const p2p = useP2PSharing(shareSocket.socket);
+
 	const form = useForm<FormSchema>({
 		resolver: zodResolver(formSchema),
 		defaultValues: {
@@ -62,105 +54,26 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 		name: "partnerRoomId",
 	});
 
-	//#region
-	const onRoomCreated: ServerToClientHandlers["room:create"] = ({ roomId }) => {
-		form.setValue("myRoomId", roomId);
-		console.log("[Socket] Room created with ID:", roomId);
-	};
-
-	const onRoomJoined: ServerToClientHandlers["room:join"] = ({ roomId }) => {
-		console.log("[Socket] Joined room:", roomId);
-	};
-
-	const onRoomRequested: ServerToClientHandlers["room:request"] = async ({
-		roomId,
-		userId,
-	}) => {
-		const accept = await alert({
-			title: "Join Request",
-			description: `User ${userId} wants to join your room.`,
-			cancel: { label: "Reject", props: { variant: "destructive" } },
-			action: { label: "Accept" },
-		});
-		if (!accept) {
-			shareSocket.rejectJoin({ roomId, userId });
-			console.log("[Socket] Rejected join request from:", userId);
-			return;
-		}
-
-		webrtc.onReady(roomId);
-		shareSocket.acceptJoin({ roomId });
-	};
-
-	const onRoomAccepted: ServerToClientHandlers["room:accept"] = ({
-		roomId,
-	}) => {
-		setIsConnecting(false);
-		setCurrentRoomId(roomId);
-		console.log("[Socket] Room accepted, waiting for offer...");
-	};
-
-	const onRoomRejected: ServerToClientHandlers["room:reject"] = ({
-		roomId,
-		userId,
-	}) => {
-		setIsConnecting(false);
-		console.log(`[Socket] Join request to ${roomId} rejected by: ${userId}`);
-	};
-
-	const onRoomTerminated: ServerToClientHandlers["room:terminate"] = () => {
-		webrtc.cleanup();
-		setCurrentRoomId(undefined);
-	};
-
-	useRoomSocket({
+	const { connecting, currentRoomId } = useRoomSocket({
 		socket: shareSocket.socket,
-		onRoomAccepted,
-		onRoomCreated,
-		onRoomJoined,
-		onRoomRejected,
-		onRoomRequested,
-		onRoomTerminated,
-	});
-	//#endregion
-
-	//#region Error Handler
-	const onError = useCallback<ServerToClientHandlers["error"]>(
-		({ messages }) => {
-			setIsConnecting(false);
-			toast.error("Socket Error", {
-				description: (
-					<ul>
-						{messages.map((msg) => (
-							<li key={msg}>{msg}</li>
-						))}
-					</ul>
-				),
-			});
-			console.error("[Socket] Socket errors:", messages);
+		onRoomCreated: ({ roomId }) => {
+			form.setValue("myRoomId", roomId);
 		},
-		[],
-	);
-	useEffect(() => {
-		shareSocket.createRoom({ roomId: shareSocket.randomId });
-		shareSocket.socket?.on("error", onError);
-	}, [
-		onError,
-		shareSocket.createRoom,
-		shareSocket.socket?.on,
-		shareSocket.randomId,
-	]);
-	//#endregion
+		onRoomRequested: ({ roomId }) => {
+			p2p.connect(roomId);
+		},
+		onRoomTerminated: () => {
+			p2p.cleanup();
+		},
+	});
 
 	const handleRoomRequest = async () => {
 		if (!partnerRoomId) return;
 
-		setIsConnecting(true);
-
-		shareSocket.joinRoom({ roomId: partnerRoomId });
+		shareSocket.socket?.emit("room:join", { roomId: partnerRoomId });
 
 		if (!shareSocket.socket?.id) return;
-		shareSocket.requestJoin({
+		shareSocket.socket.emit("room:request", {
 			roomId: partnerRoomId,
 			userId: shareSocket.socket.id,
 		});
@@ -168,7 +81,7 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 
 	const handleRoomTerminate = () => {
 		if (currentRoomId) {
-			shareSocket.terminateRoom(currentRoomId);
+			shareSocket.socket?.emit("room:terminate", currentRoomId);
 		}
 	};
 
@@ -239,16 +152,16 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 							) : (
 								<Button
 									type="button"
-									disabled={isConnecting}
+									disabled={connecting}
 									onClick={handleRoomRequest}
 								>
-									<Loader isLoading={isConnecting} />
+									<Loader isLoading={connecting} />
 									Connect
 								</Button>
 							)}
 						</div>
-						<UploadFiles webrtc={webrtc} />
-						<ReceivedFiles webrtc={webrtc} />
+						{/* <UploadFiles webrtc={webrtc} />
+						<ReceivedFiles webrtc={webrtc} /> */}
 					</FieldGroup>
 				</form>
 			</CardContent>

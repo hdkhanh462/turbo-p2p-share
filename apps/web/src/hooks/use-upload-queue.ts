@@ -1,8 +1,7 @@
-"use client";
-
 import { useRef, useState } from "react";
+
 import { delay } from "@/utils/delay";
-import { randomId } from "@/utils/random-id";
+import { randomText } from "@/utils/random-text";
 
 type UploadItem = {
 	id: string;
@@ -29,10 +28,12 @@ export interface UploadTransport {
 
 export type UseUploadQueueOptions = {
 	concurrency?: number;
+	autoRetry?: boolean;
 };
 
 const defaultOptions = {
 	concurrency: 3,
+	autoRetry: false,
 };
 
 export function useUploadQueue(
@@ -71,7 +72,7 @@ export function useUploadQueue(
 		} catch (error) {
 			if (task.controller.signal.aborted) {
 				updateItems(task.id, { status: "cancelled" });
-			} else if (task.retries < task.maxRetries) {
+			} else if (opts.autoRetry && task.retries < task.maxRetries) {
 				// Auto-retry
 				task.retries++;
 				updateItems(task.id, {
@@ -82,7 +83,10 @@ export function useUploadQueue(
 				await delay(Math.min(1000 * 2 ** task.retries, 10000));
 				requeue(task);
 			} else {
-				updateItems(task.id, { status: "error", error: String(error) });
+				updateItems(task.id, {
+					status: "error",
+					error: error instanceof Error ? error.message : String(error),
+				});
 			}
 		} finally {
 			activeRef.current--;
@@ -125,7 +129,7 @@ export function useUploadQueue(
 		options?: Pick<UploadTask, "priority" | "maxRetries">,
 	) => {
 		files.forEach((file) => {
-			const id = randomId({ prefix: "upload_" });
+			const id = randomText({ prefix: "upload_" });
 			const controller = new AbortController();
 
 			const task: UploadTask = {

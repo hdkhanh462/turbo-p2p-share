@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import type { SocketTyped } from "@/hooks/use-socket";
 import { useUploadQueue } from "@/hooks/use-upload-queue";
 import { useWebRtcReceiver } from "@/hooks/use-webrtc-receiver";
@@ -41,7 +42,7 @@ export const useP2PSharing = (socket: SocketTyped | null) => {
 
 	useEffect(() => {
 		socket?.on("file:offer", async ({ roomId, sdp }) => {
-			const pc = createPeerConnection(roomId);
+			const pc = peerRef.current || createPeerConnection(roomId);
 			await pc.setRemoteDescription(sdp);
 
 			const answer = await pc.createAnswer();
@@ -65,7 +66,17 @@ export const useP2PSharing = (socket: SocketTyped | null) => {
 		};
 	}, [socket, createPeerConnection]);
 
+	const connect = async (roomId: string) => {
+		const pc = peerRef.current || createPeerConnection(roomId);
+
+		const offer = await pc.createOffer();
+		await pc.setLocalDescription(offer);
+
+		socket?.emit("file:offer", { roomId, sdp: offer });
+	};
+
 	return {
+		connect,
 		cleanup,
 		connectionState,
 		senderItems: uploadQueue.items,

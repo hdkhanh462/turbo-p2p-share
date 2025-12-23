@@ -5,12 +5,14 @@ import {
 	useRef,
 	useState,
 } from "react";
+
 import type { ChannelMessage, FileMeta } from "@/types/webrtc";
 
 type ReceiveItem = {
 	id: string;
 	meta: FileMeta;
 	progress: number;
+	status: "receiving" | "done" | "error" | "cancelled";
 	file?: File;
 };
 
@@ -59,7 +61,11 @@ export function useWebRtcReceiver(
 							chunks: [],
 						});
 
-						updateItem(msg.id, { meta: msg.meta, progress: 0 });
+						updateItem(msg.id, {
+							meta: msg.meta,
+							status: "receiving",
+							progress: 0,
+						});
 					}
 
 					if (msg.type === "EOF") {
@@ -71,7 +77,7 @@ export function useWebRtcReceiver(
 						});
 						tasksRef.current.delete(msg.id);
 
-						updateItem(msg.id, { file, progress: 100 });
+						updateItem(msg.id, { file, status: "done", progress: 100 });
 
 						channel.send("ACK");
 					}
@@ -81,7 +87,7 @@ export function useWebRtcReceiver(
 
 				// BINARY CHUNK
 				const task = tasksRef.current.get(id);
-				if (!task) return;
+				if (!task || ev.data instanceof ArrayBuffer === false) return;
 
 				task.chunks.push(ev.data);
 				task.received += ev.data.byteLength;
@@ -94,6 +100,10 @@ export function useWebRtcReceiver(
 			channel.onclose = () => {
 				channelsRef.current.delete(id);
 				tasksRef.current.delete(id);
+			};
+
+			channel.onerror = () => {
+				updateItem(id, { status: "error" });
 			};
 		};
 
@@ -110,7 +120,10 @@ export function useWebRtcReceiver(
 	//#region PUBLIC API
 	const cancelReceive = (id: string) => {
 		const channel = channelsRef.current.get(id);
-		if (channel) channel.send("CANCEL");
+		if (channel) {
+			channel.send("CANCEL");
+			updateItem(id, { status: "cancelled" });
+		}
 	};
 	//#endregion
 

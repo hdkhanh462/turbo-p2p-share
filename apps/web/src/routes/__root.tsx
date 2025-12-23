@@ -11,14 +11,12 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import type { AppRouterClient } from "@turbo-p2p-share/api/routers/index";
 import { useState } from "react";
 
-import Header from "@/components/header";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
-import { link, type orpc } from "@/utils/orpc";
-
-import "../index.css";
 import { AlertDialogProvider } from "@/hooks/use-alert-dialog";
 import { SocketProvider } from "@/hooks/use-socket";
+import { link, type orpc } from "@/utils/orpc";
+import "../index.css";
 
 export interface RouterAppContext {
 	orpc: typeof orpc;
@@ -61,11 +59,11 @@ function RootComponent() {
 			>
 				<div className="grid h-svh grid-rows-[auto_1fr]">
 					{/* <Header /> */}
-					<AlertDialogProvider>
-						<SocketProvider>
+					<SocketProvider>
+						<AlertDialogProvider>
 							<Outlet />
-						</SocketProvider>
-					</AlertDialogProvider>
+						</AlertDialogProvider>
+					</SocketProvider>
 				</div>
 				<Toaster richColors />
 			</ThemeProvider>

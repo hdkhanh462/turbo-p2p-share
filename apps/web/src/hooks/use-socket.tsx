@@ -2,7 +2,6 @@ import type {
 	ClientToServerHandlers,
 	ServerToClientHandlers,
 } from "@turbo-p2p-share/shared/types/socket";
-import { nanoid } from "nanoid";
 import type React from "react";
 import {
 	createContext,
@@ -14,6 +13,10 @@ import {
 	useState,
 } from "react";
 import { io, type Socket } from "socket.io-client";
+import { toast } from "sonner";
+
+import useLocalStorage from "@/hooks/use-local-storage";
+import { randomText } from "@/utils/random-text";
 
 export type SocketTyped = Socket<
 	ServerToClientHandlers,
@@ -22,17 +25,8 @@ export type SocketTyped = Socket<
 
 interface SocketContextType {
 	socket: SocketTyped | null;
-	isConnected: boolean;
-	randomId: string;
-	createRoom: ClientToServerHandlers["room:create"];
-	joinRoom: ClientToServerHandlers["room:join"];
-	requestJoin: ClientToServerHandlers["room:request"];
-	acceptJoin: ClientToServerHandlers["room:accept"];
-	rejectJoin: ClientToServerHandlers["room:reject"];
-	terminateRoom: ClientToServerHandlers["room:terminate"];
-	offer: ClientToServerHandlers["file:offer"];
-	answer: ClientToServerHandlers["file:answer"];
-	candidate: ClientToServerHandlers["file:candidate"];
+	connected: boolean;
+	myRoomId: string;
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -47,103 +41,51 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
 	children,
 }) => {
 	const socketRef = useRef<SocketTyped | null>(null);
-	const [isConnected, setIsConnected] = useState(false);
-	const randomId = useMemo(() => `room_${nanoid(10)}`, []);
+
+	const [connected, setConnected] = useState(false);
+
+	const randomId = useMemo(() => randomText({ prefix: "room_" }), []);
+	const [myRoomId] = useLocalStorage("my-room-id", randomId);
+
+	const onError = useCallback<ServerToClientHandlers["error"]>(
+		({ messages }) => {
+			toast.error("Socket Error", {
+				description: (
+					<ul>
+						{messages.map((msg) => (
+							<li key={msg}>{msg}</li>
+						))}
+					</ul>
+				),
+			});
+		},
+		[],
+	);
 
 	useEffect(() => {
 		const socket = io(import.meta.env.VITE_SERVER_URL, {
 			transports: ["websocket"],
 			secure: false,
-		}) as SocketTyped;
+		});
 
 		socketRef.current = socket;
 
-		socket.on("connect", () => setIsConnected(true));
-		socket.on("disconnect", () => setIsConnected(false));
+		socket.on("connect", () => setConnected(true));
+		socket.on("disconnect", () => setConnected(false));
+		socket.on("error", onError);
 
 		return () => {
 			socket.disconnect();
 			socketRef.current = null;
 		};
-	}, []);
-
-	//#region Client to Server Handlers
-	const createRoom = useCallback<ClientToServerHandlers["room:create"]>(
-		(payload) => {
-			socketRef.current?.emit("room:create", payload);
-		},
-		[],
-	);
-
-	const joinRoom = useCallback<ClientToServerHandlers["room:join"]>(
-		(payload) => {
-			socketRef.current?.emit("room:join", payload);
-		},
-		[],
-	);
-
-	const requestJoin = useCallback<ClientToServerHandlers["room:request"]>(
-		(payload) => {
-			socketRef.current?.emit("room:request", payload);
-		},
-		[],
-	);
-
-	const acceptJoin = useCallback<ClientToServerHandlers["room:accept"]>(
-		(payload) => {
-			socketRef.current?.emit("room:accept", payload);
-		},
-		[],
-	);
-
-	const rejectJoin = useCallback<ClientToServerHandlers["room:reject"]>(
-		(payload) => {
-			socketRef.current?.emit("room:reject", payload);
-		},
-		[],
-	);
-
-	const terminateRoom = useCallback<ClientToServerHandlers["room:terminate"]>(
-		(payload) => {
-			socketRef.current?.emit("room:terminate", payload);
-		},
-		[],
-	);
-
-	const candidate = useCallback<ClientToServerHandlers["file:candidate"]>(
-		(payload) => {
-			socketRef.current?.emit("file:candidate", payload);
-		},
-		[],
-	);
-
-	const offer = useCallback<ClientToServerHandlers["file:offer"]>((payload) => {
-		socketRef.current?.emit("file:offer", payload);
-	}, []);
-
-	const answer = useCallback<ClientToServerHandlers["file:answer"]>(
-		(payload) => {
-			socketRef.current?.emit("file:answer", payload);
-		},
-		[],
-	);
-	//#endregion
+	}, [onError]);
 
 	return (
 		<SocketContext.Provider
 			value={{
 				socket: socketRef.current,
-				isConnected,
-				randomId,
-				createRoom,
-				joinRoom,
-				requestJoin,
-				acceptJoin,
-				rejectJoin,
-				terminateRoom,
-				candidate,
-				offer,
-				answer,
+				connected,
+				myRoomId,
 			}}
 		>
 			{children}
