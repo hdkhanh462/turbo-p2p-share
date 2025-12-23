@@ -38,8 +38,8 @@ type Props = {
 };
 
 export const ShareForm = ({ roomIdParam }: Props) => {
-	const shareSocket = useSocket();
-	const p2p = useP2PSharing(shareSocket.socket);
+	const { socketRef } = useSocket();
+	const p2p = useP2PSharing(socketRef);
 
 	const form = useForm<FormSchema>({
 		resolver: zodResolver(formSchema),
@@ -54,8 +54,7 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 		name: "partnerRoomId",
 	});
 
-	const { connecting, currentRoomId } = useRoomSocket({
-		socket: shareSocket.socket,
+	const { connecting, currentRoomId } = useRoomSocket(socketRef, {
 		onRoomCreated: ({ roomId }) => {
 			form.setValue("myRoomId", roomId);
 		},
@@ -70,18 +69,18 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 	const handleRoomRequest = async () => {
 		if (!partnerRoomId) return;
 
-		shareSocket.socket?.emit("room:join", { roomId: partnerRoomId });
+		socketRef.current?.emit("room:join", { roomId: partnerRoomId });
 
-		if (!shareSocket.socket?.id) return;
-		shareSocket.socket.emit("room:request", {
+		if (!socketRef.current?.id) return;
+		socketRef.current?.emit("room:request", {
 			roomId: partnerRoomId,
-			userId: shareSocket.socket.id,
+			userId: socketRef.current.id,
 		});
 	};
 
 	const handleRoomTerminate = () => {
 		if (currentRoomId) {
-			shareSocket.socket?.emit("room:terminate", currentRoomId);
+			socketRef.current?.emit("room:terminate", currentRoomId);
 		}
 	};
 

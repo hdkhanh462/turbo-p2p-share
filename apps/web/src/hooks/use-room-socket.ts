@@ -1,11 +1,10 @@
 import type { ServerToClientHandlers } from "@turbo-p2p-share/shared/types/socket";
-import { useCallback, useEffect, useState } from "react";
+import { type RefObject, useCallback, useEffect, useState } from "react";
 
 import { useAlertDialog } from "@/hooks/use-alert-dialog";
 import type { SocketTyped } from "@/hooks/use-socket";
 
-type Props = {
-	socket: SocketTyped | null;
+type UseRoomSocketOptions = {
 	onRoomCreated?: ServerToClientHandlers["room:create"];
 	onRoomJoined?: ServerToClientHandlers["room:join"];
 	onRoomRequested?: ServerToClientHandlers["room:request"];
@@ -14,20 +13,16 @@ type Props = {
 	onRoomTerminated?: ServerToClientHandlers["room:terminate"];
 };
 
-export const useRoomSocket = ({
-	socket,
-	onRoomCreated,
-	onRoomJoined,
-	onRoomRequested,
-	onRoomAccepted,
-	onRoomRejected,
-	onRoomTerminated,
-}: Props) => {
+export const useRoomSocket = (
+	socketRef: RefObject<SocketTyped | null>,
+	options?: UseRoomSocketOptions,
+) => {
 	const [connecting, setConnecting] = useState(false);
 	const [currentRoomId, setCurrentRoomId] = useState<string>();
 
 	const { alert } = useAlertDialog();
 
+	//#region HANDLERS
 	const handleRoomRequested: ServerToClientHandlers["room:request"] =
 		useCallback(
 			async ({ roomId, userId }) => {
@@ -38,65 +33,69 @@ export const useRoomSocket = ({
 					action: { label: "Accept" },
 				});
 				if (!accept) {
-					socket?.emit("room:reject", { roomId, userId });
+					socketRef.current?.emit("room:reject", { roomId, userId });
 					return;
 				}
 
-				onRoomRequested?.({ roomId, userId });
+				options?.onRoomRequested?.({ roomId, userId });
 
-				socket?.emit("room:accept", { roomId });
+				socketRef.current?.emit("room:accept", { roomId });
 			},
-			[socket, alert, onRoomRequested],
+			[socketRef, alert, options],
 		);
 
 	const handleAccepted: ServerToClientHandlers["room:accept"] = useCallback(
 		({ roomId }: { roomId: string }) => {
 			setConnecting(false);
 			setCurrentRoomId(roomId);
-			onRoomAccepted?.({ roomId });
+			options?.onRoomAccepted?.({ roomId });
 		},
-		[onRoomAccepted],
+		[options],
 	);
 
 	const handleRejected: ServerToClientHandlers["room:reject"] = useCallback(
 		(payload) => {
 			setConnecting(false);
-			onRoomRejected?.(payload);
+			options?.onRoomRejected?.(payload);
 		},
-		[onRoomRejected],
+		[options],
 	);
 
 	const handleTerminated: ServerToClientHandlers["room:terminate"] =
 		useCallback(() => {
 			setConnecting(false);
 			setCurrentRoomId(undefined);
-			onRoomTerminated?.();
-		}, [onRoomTerminated]);
+			options?.onRoomTerminated?.();
+		}, [options]);
+	//#endregion
 
 	useEffect(() => {
-		socket?.on("room:create", (payload) => onRoomCreated?.(payload));
-		socket?.on("room:join", (payload) => onRoomJoined?.(payload));
-		socket?.on("room:request", handleRoomRequested);
-		socket?.on("room:accept", handleAccepted);
-		socket?.on("room:reject", handleRejected);
-		socket?.on("room:terminate", handleTerminated);
+		socketRef.current?.on("room:create", (payload) =>
+			options?.onRoomCreated?.(payload),
+		);
+		socketRef.current?.on("room:join", (payload) =>
+			options?.onRoomJoined?.(payload),
+		);
+		socketRef.current?.on("room:request", handleRoomRequested);
+		socketRef.current?.on("room:accept", handleAccepted);
+		socketRef.current?.on("room:reject", handleRejected);
+		socketRef.current?.on("room:terminate", handleTerminated);
 
 		return () => {
-			socket?.off("room:create", onRoomCreated);
-			socket?.off("room:join", onRoomJoined);
-			socket?.off("room:request", handleRoomRequested);
-			socket?.off("room:accept", handleAccepted);
-			socket?.off("room:reject", handleRejected);
-			socket?.off("room:terminate", handleTerminated);
+			socketRef.current?.off("room:create", options?.onRoomCreated);
+			socketRef.current?.off("room:join", options?.onRoomJoined);
+			socketRef.current?.off("room:request", handleRoomRequested);
+			socketRef.current?.off("room:accept", handleAccepted);
+			socketRef.current?.off("room:reject", handleRejected);
+			socketRef.current?.off("room:terminate", handleTerminated);
 		};
 	}, [
-		socket,
+		socketRef,
+		options,
 		handleRoomRequested,
 		handleAccepted,
 		handleRejected,
 		handleTerminated,
-		onRoomCreated,
-		onRoomJoined,
 	]);
 
 	return { connecting, currentRoomId };

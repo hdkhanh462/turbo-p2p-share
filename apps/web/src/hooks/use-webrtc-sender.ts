@@ -1,16 +1,28 @@
 import { type RefObject, useRef } from "react";
-import type { UploadTask } from "@/hooks/use-upload-queue";
+
+import type { UploadTransport } from "@/hooks/use-upload-queue";
 import type { ChannelMessage } from "@/types/webrtc";
 
-const CHUNK_SIZE = 16 * 1024; // 16KB
+type UseWebRtcSenderOptions = {
+	chunkSize?: number;
+	speedLimit?: number;
+};
 
-export function useWebRtcSender(peerRef: RefObject<RTCPeerConnection | null>) {
+const DEFAULT_OPTIONS = {
+	chunkSize: 16 * 1024, // 16KB
+};
+
+export function useWebRtcSender(
+	peerRef: RefObject<RTCPeerConnection | null>,
+	options?: UseWebRtcSenderOptions,
+) {
+	const opts = { ...DEFAULT_OPTIONS, ...options };
 	const channelsRef = useRef<Map<string, RTCDataChannel>>(new Map());
 
 	//#region HELPERS
 	const waitBufferedLow = (channel: RTCDataChannel) =>
 		new Promise<void>((resolve) => {
-			channel.bufferedAmountLowThreshold = 2 * CHUNK_SIZE;
+			channel.bufferedAmountLowThreshold = 2 * opts.chunkSize;
 			channel.onbufferedamountlow = () => resolve();
 		});
 
@@ -20,11 +32,13 @@ export function useWebRtcSender(peerRef: RefObject<RTCPeerConnection | null>) {
 	//#endregion
 
 	//#region PUBLIC API
-	const upload = async (task: UploadTask, onProgress: (p: number) => void) => {
+	const upload: UploadTransport["upload"] = async (task, onProgress) => {
 		if (!peerRef.current) throw new Error("Not connected");
 
 		const channel = peerRef.current.createDataChannel(task.id);
 		channel.binaryType = "arraybuffer";
+		if (opts.speedLimit) channel.bufferedAmountLowThreshold = opts.speedLimit;
+
 		channelsRef.current.set(task.id, channel);
 
 		sendMessage(channel, {
@@ -43,16 +57,16 @@ export function useWebRtcSender(peerRef: RefObject<RTCPeerConnection | null>) {
 		return new Promise<void>((resolve, reject) => {
 			channel.onopen = async () => {
 				while (offset < total) {
-					const chunk = task.file.slice(offset, offset + CHUNK_SIZE);
+					const chunk = task.file.slice(offset, offset + opts.chunkSize);
 					const buffer = await chunk.arrayBuffer();
 
 					channel.send(buffer);
-					offset += CHUNK_SIZE;
+					offset += opts.chunkSize;
 
 					onProgress(Math.round((offset / total) * 100));
 
 					// backpressure
-					if (channel.bufferedAmount > 4 * CHUNK_SIZE) {
+					if (channel.bufferedAmount > 4 * opts.chunkSize) {
 						await waitBufferedLow(channel);
 					}
 				}
@@ -81,7 +95,7 @@ export function useWebRtcSender(peerRef: RefObject<RTCPeerConnection | null>) {
 		});
 	};
 
-	const cancel = (taskId: string) => {
+	const cancel: UploadTransport["cancel"] = (taskId) => {
 		channelsRef.current.get(taskId)?.close();
 	};
 	//#endregion

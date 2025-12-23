@@ -39,6 +39,7 @@ export function useWebRtcReceiver(
 	}, []);
 	//#endregion
 
+	//#region CORE
 	useEffect(() => {
 		if (!peerRef.current) return;
 
@@ -116,6 +117,7 @@ export function useWebRtcReceiver(
 			tasksRef.current.clear();
 		};
 	}, [peerRef, updateItem]);
+	//#endregion
 
 	//#region PUBLIC API
 	const cancelReceive = (id: string) => {

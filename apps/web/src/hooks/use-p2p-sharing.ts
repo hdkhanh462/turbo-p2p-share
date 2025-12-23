@@ -1,11 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	type RefObject,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 
 import type { SocketTyped } from "@/hooks/use-socket";
 import { useUploadQueue } from "@/hooks/use-upload-queue";
 import { useWebRtcReceiver } from "@/hooks/use-webrtc-receiver";
 import { useWebRtcSender } from "@/hooks/use-webrtc-sender";
 
-export const useP2PSharing = (socket: SocketTyped | null) => {
+export const useP2PSharing = (socketRef: RefObject<SocketTyped | null>) => {
 	const peerRef = useRef<RTCPeerConnection | null>(null);
 
 	const sender = useWebRtcSender(peerRef);
@@ -22,7 +28,10 @@ export const useP2PSharing = (socket: SocketTyped | null) => {
 
 			pc.onicecandidate = (e) => {
 				if (e.candidate) {
-					socket?.emit("file:candidate", { roomId, candidate: e.candidate });
+					socketRef.current?.emit("file:candidate", {
+						roomId,
+						candidate: e.candidate,
+					});
 				}
 			};
 
@@ -31,7 +40,7 @@ export const useP2PSharing = (socket: SocketTyped | null) => {
 			peerRef.current = pc;
 			return pc;
 		},
-		[socket],
+		[socketRef],
 	);
 
 	const cleanup = () => {
@@ -41,30 +50,30 @@ export const useP2PSharing = (socket: SocketTyped | null) => {
 	//#endregion
 
 	useEffect(() => {
-		socket?.on("file:offer", async ({ roomId, sdp }) => {
+		socketRef.current?.on("file:offer", async ({ roomId, sdp }) => {
 			const pc = peerRef.current || createPeerConnection(roomId);
 			await pc.setRemoteDescription(sdp);
 
 			const answer = await pc.createAnswer();
 			await pc.setLocalDescription(answer);
 
-			socket.emit("file:answer", { roomId, sdp: answer });
+			socketRef.current?.emit("file:answer", { roomId, sdp: answer });
 		});
 
-		socket?.on("file:answer", async ({ sdp }) => {
+		socketRef.current?.on("file:answer", async ({ sdp }) => {
 			await peerRef.current?.setRemoteDescription(sdp);
 		});
 
-		socket?.on("file:candidate", async ({ candidate }) => {
+		socketRef.current?.on("file:candidate", async ({ candidate }) => {
 			await peerRef.current?.addIceCandidate(candidate);
 		});
 
 		return () => {
-			socket?.off("file:offer");
-			socket?.off("file:answer");
-			socket?.off("file:candidate");
+			socketRef.current?.off("file:offer");
+			socketRef.current?.off("file:answer");
+			socketRef.current?.off("file:candidate");
 		};
-	}, [socket, createPeerConnection]);
+	}, [socketRef, createPeerConnection]);
 
 	const connect = async (roomId: string) => {
 		const pc = peerRef.current || createPeerConnection(roomId);
@@ -72,7 +81,7 @@ export const useP2PSharing = (socket: SocketTyped | null) => {
 		const offer = await pc.createOffer();
 		await pc.setLocalDescription(offer);
 
-		socket?.emit("file:offer", { roomId, sdp: offer });
+		socketRef.current?.emit("file:offer", { roomId, sdp: offer });
 	};
 
 	return {
