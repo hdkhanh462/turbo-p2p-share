@@ -111,7 +111,7 @@ export const useWebRTC = ({ socket }: Props) => {
 						}
 					}
 				} else {
-					// === Handle incoming file chunk ===
+					// Handle incoming file chunk
 					if (!incomingData.current.data) return;
 					incomingData.current.chunks.push(e.data);
 					const receivedSize = incomingData.current.chunks.reduce(

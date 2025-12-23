@@ -1,10 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowUpRightFromSquareIcon } from "lucide-react";
+import { useEffect } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import z from "zod";
-
 import { InputCopyPaste } from "@/components/input-copy-paste";
 import Loader from "@/components/loader";
+import { ReceivedFiles } from "@/components/received-files";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -19,6 +20,7 @@ import {
 	FieldGroup,
 	FieldLabel,
 } from "@/components/ui/field";
+import { UploadFiles } from "@/components/upload-files";
 import { useP2PSharing } from "@/hooks/use-p2p-sharing";
 import { useRoomSocket } from "@/hooks/use-room-socket";
 import { useSocket } from "@/hooks/use-socket";
@@ -38,8 +40,8 @@ type Props = {
 };
 
 export const ShareForm = ({ roomIdParam }: Props) => {
-	const { socketRef } = useSocket();
-	const p2p = useP2PSharing(socketRef);
+	const { socket, myRoomId } = useSocket();
+	const p2p = useP2PSharing(socket);
 
 	const form = useForm<FormSchema>({
 		resolver: zodResolver(formSchema),
@@ -54,34 +56,42 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 		name: "partnerRoomId",
 	});
 
-	const { connecting, currentRoomId } = useRoomSocket(socketRef, {
-		onRoomCreated: ({ roomId }) => {
-			form.setValue("myRoomId", roomId);
+	const { connecting, currentRoomId, request, terminate } = useRoomSocket(
+		socket,
+		{
+			onRoomCreated: ({ roomId }) => {
+				console.log("[Room] Created:", roomId);
+
+				form.setValue("myRoomId", roomId);
+			},
+			onRoomRequested: (payload, accept) => {
+				console.log("[Room] Request received:", { payload, accept });
+
+				if (accept) p2p.connect(payload.roomId);
+			},
+			onRoomTerminated: () => {
+				console.log("[Room] Terminated");
+
+				p2p.cleanup();
+			},
+			onRoomAccepted: (payload) => {
+				console.log("[Room] Accepted:", payload);
+			},
+			onRoomJoined: (payload) => {
+				console.log("[Room] Joined:", payload);
+			},
+			onRoomRejected: (payload) => {
+				console.log("[Room] Rejected: ", payload);
+			},
 		},
-		onRoomRequested: ({ roomId }) => {
-			p2p.connect(roomId);
-		},
-		onRoomTerminated: () => {
-			p2p.cleanup();
-		},
-	});
+	);
 
-	const handleRoomRequest = async () => {
-		if (!partnerRoomId) return;
+	useEffect(() => {
+		socket?.emit("room:create", { roomId: myRoomId });
+	}, [socket, myRoomId]);
 
-		socketRef.current?.emit("room:join", { roomId: partnerRoomId });
-
-		if (!socketRef.current?.id) return;
-		socketRef.current?.emit("room:request", {
-			roomId: partnerRoomId,
-			userId: socketRef.current.id,
-		});
-	};
-
-	const handleRoomTerminate = () => {
-		if (currentRoomId) {
-			socketRef.current?.emit("room:terminate", currentRoomId);
-		}
+	const handleRoomRequest = () => {
+		if (partnerRoomId) request(partnerRoomId);
 	};
 
 	return (
@@ -141,11 +151,7 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 								)}
 							/>
 							{currentRoomId ? (
-								<Button
-									type="button"
-									variant="destructive"
-									onClick={handleRoomTerminate}
-								>
+								<Button type="button" variant="destructive" onClick={terminate}>
 									Terminate
 								</Button>
 							) : (
@@ -159,8 +165,8 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 								</Button>
 							)}
 						</div>
-						{/* <UploadFiles webrtc={webrtc} />
-						<ReceivedFiles webrtc={webrtc} /> */}
+						<UploadFiles p2p={p2p} />
+						<ReceivedFiles p2p={p2p} />
 					</FieldGroup>
 				</form>
 			</CardContent>

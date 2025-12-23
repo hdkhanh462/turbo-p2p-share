@@ -3,13 +3,14 @@ import { useRef, useState } from "react";
 import { delay } from "@/utils/delay";
 import { randomText } from "@/utils/random-text";
 
-type UploadItem = {
+export type UploadItem = {
 	id: string;
 	file: File;
 	progress: number;
 	status: "waiting" | "uploading" | "done" | "error" | "cancelled";
 	error?: string;
 	cancel: () => void;
+	remove: () => void;
 };
 
 export type UploadTask = {
@@ -26,21 +27,30 @@ export interface UploadTransport {
 	cancel(taskId: string): void;
 }
 
-export type UseUploadQueueOptions = {
+export type UploadQueueOptions = {
 	concurrency?: number;
 	autoRetry?: boolean;
 };
 
-const defaultOptions = {
+const DEFAULT_QUEUE_OPTIONS: Required<UploadQueueOptions> = {
 	concurrency: 3,
 	autoRetry: false,
 };
 
+export type UploadTaskOptions = Partial<
+	Pick<UploadTask, "priority" | "maxRetries">
+>;
+
+const DEFAULT_TASK_OPTIONS: Required<UploadTaskOptions> = {
+	priority: 0,
+	maxRetries: 3,
+};
+
 export function useUploadQueue(
 	transport: UploadTransport,
-	options?: UseUploadQueueOptions,
+	options?: UploadQueueOptions,
 ) {
-	const opts = { ...defaultOptions, ...options };
+	const opts = { ...DEFAULT_QUEUE_OPTIONS, ...options };
 
 	const queueRef = useRef<UploadTask[]>([]);
 	const headRef = useRef(0);
@@ -121,13 +131,15 @@ export function useUploadQueue(
 	const updateItems = (id: string, item: Partial<UploadItem>) => {
 		setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...item } : i)));
 	};
+
+	const removeItem = (id: string) => {
+		setItems((prev) => prev.filter((i) => i.id !== id));
+	};
 	//#endregion
 
 	//#region PUBLIC API
-	const addFiles = (
-		files: File[],
-		options?: Pick<UploadTask, "priority" | "maxRetries">,
-	) => {
+	const addFiles = (files: File[], options?: UploadTaskOptions) => {
+		const taskOptions = { ...DEFAULT_TASK_OPTIONS, ...options };
 		files.forEach((file) => {
 			const id = randomText({ prefix: "upload_" });
 			const controller = new AbortController();
@@ -135,11 +147,12 @@ export function useUploadQueue(
 			const task: UploadTask = {
 				id,
 				file,
-				priority: options?.priority ?? 0,
-				retries: 0,
-				maxRetries: options?.maxRetries ?? 3,
 				controller,
+				retries: 0,
+				...taskOptions,
 			};
+
+			console.log("[Upload] Task created:", task);
 
 			queueRef.current.push(task);
 			sortQueue();
@@ -150,6 +163,7 @@ export function useUploadQueue(
 				progress: 0,
 				status: "waiting",
 				cancel: () => controller.abort(),
+				remove: () => removeItem(id),
 			});
 
 			process();

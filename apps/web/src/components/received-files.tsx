@@ -9,57 +9,51 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Field, FieldLabel } from "@/components/ui/field";
-import type { useWebRTC } from "@/hooks/use-webrtc";
+import type { useP2PSharing } from "@/hooks/use-p2p-sharing";
 import { downloadFile } from "@/utils/download";
 
 type Props = {
-	webrtc: ReturnType<typeof useWebRTC>;
+	p2p: ReturnType<typeof useP2PSharing>;
 };
 
-export const ReceivedFiles = ({
-	webrtc: { receivedFiles, setReceivedFiles, cancelSendFile },
-}: Props) => {
-	const removeReceivedFiles = (id: string) => {
-		setReceivedFiles((prev) => prev.filter((f) => f.id !== id));
-	};
-
+export const ReceivedFiles = ({ p2p: { receiverItems } }: Props) => {
 	return (
 		<Field>
 			<FieldLabel>Received Files</FieldLabel>
 
 			<FileList empty={<ReceivedFilesEmpty />}>
-				{receivedFiles.map((data) => (
+				{receiverItems.map((item) => (
 					<TransferFileItem
-						key={data.id}
-						data={data}
+						key={item.id}
+						data={{ type: "receive", item }}
 						action={
 							<>
-								{data.status === "completed" && (
+								{item.status === "done" && (
 									<Button
 										variant="ghost"
 										size="icon"
 										className="size-7"
-										onClick={() => data.file && downloadFile(data.file)}
+										onClick={() => item.file && downloadFile(item.file)}
 									>
 										<DownloadIcon />
 									</Button>
 								)}
-								{data.status === "receiving" && (
+								{item.status === "receiving" && (
 									<Button
 										variant="ghost"
 										size="icon"
 										className="size-7"
-										onClick={() => cancelSendFile(data.id, "receiver")}
+										onClick={() => item.cancel()}
 									>
 										<BanIcon />
 									</Button>
 								)}
-								{data.status !== "receiving" && (
+								{item.status !== "receiving" && (
 									<Button
 										variant="ghost"
 										size="icon"
 										className="size-7"
-										onClick={() => removeReceivedFiles(data.id)}
+										onClick={() => item.remove()}
 									>
 										<XIcon />
 									</Button>

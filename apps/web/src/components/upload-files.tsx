@@ -1,6 +1,7 @@
 import { BanIcon, UploadIcon, XIcon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
+
 import { FileList } from "@/components/file-list";
 import { TransferFileItem } from "@/components/transfer-file-item";
 import { Button } from "@/components/ui/button";
@@ -14,15 +15,13 @@ import {
 	FileUploadItemPreview,
 	type FileUploadProps,
 } from "@/components/ui/file-upload";
-import type { useWebRTC } from "@/hooks/use-webrtc";
+import type { useP2PSharing } from "@/hooks/use-p2p-sharing";
 
 type Props = {
-	webrtc: ReturnType<typeof useWebRTC>;
+	p2p: ReturnType<typeof useP2PSharing>;
 };
 
-export function UploadFiles({
-	webrtc: { sentFiles, sendFile, cancelSendFile, setSentFiles },
-}: Props) {
+export function UploadFiles({ p2p: { senderItems, addFiles } }: Props) {
 	const [files, setFiles] = React.useState<File[]>([]);
 
 	const onUpload: NonNullable<FileUploadProps["onUpload"]> = React.useCallback(
@@ -79,14 +78,10 @@ export function UploadFiles({
 					(f) => f.name !== file.name && f.lastModified !== file.lastModified,
 				),
 			);
-			await sendFile(file);
+			addFiles([file]);
 		} catch (error) {
 			console.error("Upload failed", error);
 		}
-	};
-
-	const removeSendingFile = (id: string) => {
-		setSentFiles((prev) => prev.filter((f) => f.id !== id));
 	};
 
 	return (
@@ -119,38 +114,38 @@ export function UploadFiles({
 							onSendFile={onSendFile}
 						/>
 					))}
-					{sentFiles.map((data) => (
+					{senderItems.map((item) => (
 						<TransferFileItem
-							key={data.id}
-							data={data}
+							key={item.id}
+							data={{ type: "upload", item: item }}
 							action={
 								<>
-									{data.status === "sending" && (
+									{item.status === "uploading" && (
 										<Button
 											variant="ghost"
 											size="icon"
 											className="size-7"
-											onClick={() => cancelSendFile(data.id, "sender")}
+											onClick={() => item.cancel()}
 										>
 											<BanIcon />
 										</Button>
 									)}
-									{data.status !== "sending" && data.status !== "completed" && (
+									{item.status !== "uploading" && item.status !== "done" && (
 										<Button
 											variant="ghost"
 											size="icon"
 											className="size-7"
-											onClick={() => onSendFile(data.file)}
+											onClick={() => onSendFile(item.file)}
 										>
 											<UploadIcon />
 										</Button>
 									)}
-									{data.status !== "sending" && (
+									{item.status !== "uploading" && (
 										<Button
 											variant="ghost"
 											size="icon"
 											className="size-7"
-											onClick={() => removeSendingFile(data.id)}
+											onClick={() => item.remove()}
 										>
 											<XIcon />
 										</Button>

@@ -1,19 +1,32 @@
 import * as React from "react";
 import { FileItemProgress } from "@/components/file-download-item-progress";
 import { formatBytes, getFileIcon } from "@/components/ui/file-upload";
-import type { TransferData } from "@/types/webrtc";
+import type { UploadItem } from "@/hooks/use-upload-queue";
+import type { ReceiveItem } from "@/hooks/use-webrtc-receiver";
+import type { FileMeta } from "@/types/webrtc";
 
 type Props = {
-	data: TransferData;
+	data:
+		| { type: "upload"; item: UploadItem }
+		| { type: "receive"; item: ReceiveItem };
 	action?: React.ReactNode;
 };
 
 export function TransferFileItem({ data, action }: Props) {
+	const meta: FileMeta =
+		data.type === "upload"
+			? {
+					name: data.item.file.name,
+					mime: data.item.file.type,
+					size: data.item.file.size,
+				}
+			: data.item.meta;
+
 	const previewUrl = React.useMemo(() => {
-		return data.file?.type.startsWith("image/")
-			? URL.createObjectURL(data.file)
+		return data.item.file?.type.startsWith("image/")
+			? URL.createObjectURL(data.item.file)
 			: null;
-	}, [data.file]);
+	}, [data.item.file]);
 
 	React.useEffect(() => {
 		return () => {
@@ -30,19 +43,19 @@ export function TransferFileItem({ data, action }: Props) {
 					{previewUrl ? (
 						<img
 							src={previewUrl}
-							alt={data.meta.name}
+							alt={meta.name}
 							className="size-full object-cover"
 						/>
 					) : (
-						getFileIcon({ type: data.meta.mime, name: data.meta.name })
+						getFileIcon({ name: meta.name, type: meta.mime })
 					)}
 				</div>
 
 				{/* Metadata */}
 				<div className="flex min-w-0 flex-1 flex-col">
-					<span className="truncate font-medium text-sm">{data.meta.name}</span>
+					<span className="truncate font-medium text-sm">{meta.name}</span>
 					<span className="truncate text-muted-foreground text-xs">
-						{formatBytes(data.meta.size)}
+						{formatBytes(meta.size)}
 					</span>
 				</div>
 
@@ -51,8 +64,9 @@ export function TransferFileItem({ data, action }: Props) {
 			</div>
 
 			{/* Progress */}
-			{(data.status === "sending" || data.status === "receiving") && (
-				<FileItemProgress progress={data.progress} />
+			{(data.item.status === "uploading" ||
+				data.item.status === "receiving") && (
+				<FileItemProgress progress={data.item.progress} />
 			)}
 		</div>
 	);

@@ -5,8 +5,8 @@ type RandomTextOptions = {
 	prefix?: string;
 };
 
-const DEFAULT_OPTIONS = {
-	length: 10,
+const DEFAULT_OPTIONS: Required<Pick<RandomTextOptions, "length">> = {
+	length: 5,
 };
 
 export function randomText(options?: RandomTextOptions) {

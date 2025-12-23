@@ -1,22 +1,23 @@
-import { type RefObject, useRef } from "react";
+import { useRef } from "react";
 
 import type { UploadTransport } from "@/hooks/use-upload-queue";
 import type { ChannelMessage } from "@/types/webrtc";
+import { sendMessage } from "@/utils/webrtc";
 
-type UseWebRtcSenderOptions = {
+type SenderOptions = {
 	chunkSize?: number;
 	speedLimit?: number;
 };
 
-const DEFAULT_OPTIONS = {
+const DEFAULT_SENDER_OPTIONS: Required<Pick<SenderOptions, "chunkSize">> = {
 	chunkSize: 16 * 1024, // 16KB
 };
 
 export function useWebRtcSender(
-	peerRef: RefObject<RTCPeerConnection | null>,
-	options?: UseWebRtcSenderOptions,
+	peer: RTCPeerConnection | null,
+	options?: SenderOptions,
 ) {
-	const opts = { ...DEFAULT_OPTIONS, ...options };
+	const opts = { ...DEFAULT_SENDER_OPTIONS, ...options };
 	const channelsRef = useRef<Map<string, RTCDataChannel>>(new Map());
 
 	//#region HELPERS
@@ -26,36 +27,58 @@ export function useWebRtcSender(
 			channel.onbufferedamountlow = () => resolve();
 		});
 
-	const sendMessage = (channel: RTCDataChannel, payload: ChannelMessage) => {
-		channel.send(JSON.stringify(payload));
-	};
+	function waitForOpen(channel: RTCDataChannel): Promise<void> {
+		if (channel.readyState === "open") return Promise.resolve();
+
+		return new Promise((resolve, reject) => {
+			const timeout = setTimeout(() => {
+				reject(new Error("DataChannel open timeout"));
+			}, 10000);
+
+			channel.onopen = () => {
+				clearTimeout(timeout);
+				resolve();
+			};
+
+			channel.onerror = () => {
+				clearTimeout(timeout);
+				reject(new Error("DataChannel error before open"));
+			};
+		});
+	}
+
 	//#endregion
 
 	//#region PUBLIC API
 	const upload: UploadTransport["upload"] = async (task, onProgress) => {
-		if (!peerRef.current) throw new Error("Not connected");
+		console.log("[Sender] Uploading:", { task, peer });
+		if (!peer) throw new Error("Not connected");
 
-		const channel = peerRef.current.createDataChannel(task.id);
+		const channel = peer.createDataChannel(task.id);
 		channel.binaryType = "arraybuffer";
 		if (opts.speedLimit) channel.bufferedAmountLowThreshold = opts.speedLimit;
 
 		channelsRef.current.set(task.id, channel);
 
-		sendMessage(channel, {
-			type: "META",
-			id: task.id,
-			meta: {
-				name: task.file.name,
-				size: task.file.size,
-				mime: task.file.type,
-			},
-		});
+		console.log("[DEBUG] Channel:", { peer, channel });
+
+		await waitForOpen(channel);
 
 		const total = task.file.size;
 		let offset = 0;
 
 		return new Promise<void>((resolve, reject) => {
 			channel.onopen = async () => {
+				sendMessage(channel, {
+					type: "META",
+					id: task.id,
+					meta: {
+						name: task.file.name,
+						size: task.file.size,
+						mime: task.file.type,
+					},
+				});
+
 				while (offset < total) {
 					const chunk = task.file.slice(offset, offset + opts.chunkSize);
 					const buffer = await chunk.arrayBuffer();
@@ -74,15 +97,20 @@ export function useWebRtcSender(
 				sendMessage(channel, { type: "EOF", id: task.id });
 			};
 
-			channel.onmessage = (e) => {
-				if (e.data === "CANCEL") {
-					channel.close();
-					reject("cancelled by receiver");
-				}
+			channel.onmessage = (ev) => {
+				if (typeof ev.data === "string") {
+					const msg: ChannelMessage = JSON.parse(ev.data);
+					if (task.id !== msg.id) return;
 
-				if (e.data === "ACK") {
-					channel.close();
-					resolve();
+					if (msg.type === "CANCEL") {
+						channel.close();
+						reject("cancelled by receiver");
+					}
+
+					if (msg.type === "ACK") {
+						channel.close();
+						resolve();
+					}
 				}
 			};
 

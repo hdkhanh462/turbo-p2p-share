@@ -5,7 +5,6 @@ import type {
 import type React from "react";
 import {
 	createContext,
-	type RefObject,
 	useCallback,
 	useContext,
 	useEffect,
@@ -24,7 +23,7 @@ export type SocketTyped = Socket<
 >;
 
 interface SocketContextType {
-	socketRef: RefObject<SocketTyped | null>;
+	socket: SocketTyped | null;
 	connected: boolean;
 	myRoomId: string;
 }
@@ -44,8 +43,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
 
 	const [connected, setConnected] = useState(false);
 
-	const randomId = useMemo(() => randomText({ prefix: "room_" }), []);
-	const [myRoomId] = useLocalStorage("my-room-id", randomId);
+	const myRoomId = useMemo(() => randomText({ prefix: "room_" }), []);
+	// const [myRoomId] = useLocalStorage("my-room-id", randomId);
 
 	const onError = useCallback<ServerToClientHandlers["error"]>(
 		({ messages }) => {
@@ -83,7 +82,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
 	return (
 		<SocketContext.Provider
 			value={{
-				socketRef,
+				socket: socketRef.current,
 				connected,
 				myRoomId,
 			}}

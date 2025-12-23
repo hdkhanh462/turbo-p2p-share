@@ -1,21 +1,15 @@
-import {
-	type RefObject,
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { SocketTyped } from "@/hooks/use-socket";
 import { useUploadQueue } from "@/hooks/use-upload-queue";
 import { useWebRtcReceiver } from "@/hooks/use-webrtc-receiver";
 import { useWebRtcSender } from "@/hooks/use-webrtc-sender";
 
-export const useP2PSharing = (socketRef: RefObject<SocketTyped | null>) => {
+export const useP2PSharing = (socket: SocketTyped | null) => {
 	const peerRef = useRef<RTCPeerConnection | null>(null);
 
-	const sender = useWebRtcSender(peerRef);
-	const receiver = useWebRtcReceiver(peerRef);
+	const sender = useWebRtcSender(peerRef.current);
+	const receiver = useWebRtcReceiver(peerRef.current);
 	const uploadQueue = useUploadQueue(sender);
 
 	const [connectionState, setConnectionState] =
@@ -28,7 +22,7 @@ export const useP2PSharing = (socketRef: RefObject<SocketTyped | null>) => {
 
 			pc.onicecandidate = (e) => {
 				if (e.candidate) {
-					socketRef.current?.emit("file:candidate", {
+					socket?.emit("file:candidate", {
 						roomId,
 						candidate: e.candidate,
 					});
@@ -40,7 +34,7 @@ export const useP2PSharing = (socketRef: RefObject<SocketTyped | null>) => {
 			peerRef.current = pc;
 			return pc;
 		},
-		[socketRef],
+		[socket],
 	);
 
 	const cleanup = () => {
@@ -50,30 +44,36 @@ export const useP2PSharing = (socketRef: RefObject<SocketTyped | null>) => {
 	//#endregion
 
 	useEffect(() => {
-		socketRef.current?.on("file:offer", async ({ roomId, sdp }) => {
+		socket?.on("file:offer", async ({ roomId, sdp }) => {
+			console.log("[WebRTC] Offer received:", { roomId, sdp });
+
 			const pc = peerRef.current || createPeerConnection(roomId);
 			await pc.setRemoteDescription(sdp);
 
 			const answer = await pc.createAnswer();
 			await pc.setLocalDescription(answer);
 
-			socketRef.current?.emit("file:answer", { roomId, sdp: answer });
+			socket?.emit("file:answer", { roomId, sdp: answer });
 		});
 
-		socketRef.current?.on("file:answer", async ({ sdp }) => {
+		socket?.on("file:answer", async ({ sdp }) => {
+			console.log("[WebRTC] Answer received:", sdp);
+
 			await peerRef.current?.setRemoteDescription(sdp);
 		});
 
-		socketRef.current?.on("file:candidate", async ({ candidate }) => {
+		socket?.on("file:candidate", async ({ candidate }) => {
+			console.log("[WebRTC] Candidate received:", candidate);
+
 			await peerRef.current?.addIceCandidate(candidate);
 		});
 
 		return () => {
-			socketRef.current?.off("file:offer");
-			socketRef.current?.off("file:answer");
-			socketRef.current?.off("file:candidate");
+			socket?.off("file:offer");
+			socket?.off("file:answer");
+			socket?.off("file:candidate");
 		};
-	}, [socketRef, createPeerConnection]);
+	}, [socket, createPeerConnection]);
 
 	const connect = async (roomId: string) => {
 		const pc = peerRef.current || createPeerConnection(roomId);
@@ -81,7 +81,7 @@ export const useP2PSharing = (socketRef: RefObject<SocketTyped | null>) => {
 		const offer = await pc.createOffer();
 		await pc.setLocalDescription(offer);
 
-		socketRef.current?.emit("file:offer", { roomId, sdp: offer });
+		socket?.emit("file:offer", { roomId, sdp: offer });
 	};
 
 	return {

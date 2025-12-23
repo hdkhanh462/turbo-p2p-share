@@ -13,10 +13,17 @@ export function useLocalStorage<T = null>(
 	initialValue: T,
 ): [T, Dispatch<SetStateAction<T>>] {
 	const readValue = useCallback((): T => {
-		if (typeof window === "undefined") return initialValue;
+		if (typeof window === "undefined") {
+			console.error("[LocalStorage] Window is undefined");
+			return initialValue;
+		}
 		try {
 			const item = window.localStorage.getItem(key);
-			return item ? (JSON.parse(item) as T) : initialValue;
+			if (!item) {
+				window.localStorage.setItem(key, JSON.stringify(initialValue));
+				return initialValue;
+			}
+			return JSON.parse(item) as T;
 		} catch (error) {
 			console.error(`[LocalStorage] Error reading key ${key}: `, error);
 			return initialValue;
