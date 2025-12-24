@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/file-upload";
 import type { useP2PSharing } from "@/hooks/use-p2p-sharing";
 
+const MAX_FILES = 5;
+
 type Props = {
 	p2p: ReturnType<typeof useP2PSharing>;
 };
@@ -57,7 +59,7 @@ export function UploadFiles({ p2p: { senderItems, addFiles } }: Props) {
 				onValueChange={setFiles}
 				onFileReject={onFileReject}
 				onUpload={onMultipleUpload}
-				maxFiles={5}
+				maxFiles={MAX_FILES}
 				className="w-full"
 				multiple
 			>
@@ -68,7 +70,7 @@ export function UploadFiles({ p2p: { senderItems, addFiles } }: Props) {
 						</div>
 						<p className="font-medium text-sm">Drag & drop files here</p>
 						<p className="text-muted-foreground text-xs">
-							Or click to browse (max 5 files)
+							Or click to browse (max {MAX_FILES} files)
 						</p>
 					</div>
 				</FileUploadDropzone>
