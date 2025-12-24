@@ -20,22 +20,6 @@ export const useP2PSharing = (socket: SocketTyped | null) => {
 		(roomId: string) => {
 			const pc = new RTCPeerConnection({ iceServers: [] });
 
-			let makingOffer = false;
-
-			pc.onnegotiationneeded = async () => {
-				if (makingOffer) return;
-				if (pc.signalingState !== "stable") return;
-
-				try {
-					makingOffer = true;
-					const offer = await pc.createOffer();
-					await pc.setLocalDescription(offer);
-					socket?.emit("file:offer", { roomId, sdp: offer });
-				} finally {
-					makingOffer = false;
-				}
-			};
-
 			pc.onicecandidate = (e) => {
 				if (e.candidate) {
 					socket?.emit("file:candidate", {
@@ -61,7 +45,7 @@ export const useP2PSharing = (socket: SocketTyped | null) => {
 
 	useEffect(() => {
 		socket?.on("file:offer", async ({ roomId, sdp }) => {
-			console.log("[WebRTC] Offer received:", { roomId, sdp });
+			console.log("[P2P] Offer received:", { roomId, sdp });
 
 			const pc = peer || createPeerConnection(roomId);
 			await pc.setRemoteDescription(sdp);
@@ -73,14 +57,12 @@ export const useP2PSharing = (socket: SocketTyped | null) => {
 		});
 
 		socket?.on("file:answer", async ({ sdp }) => {
-			console.log("[WebRTC] Answer received:", sdp);
+			console.log("[P2P] Answer received:", sdp);
 
 			await peer?.setRemoteDescription(sdp);
 		});
 
 		socket?.on("file:candidate", async ({ candidate }) => {
-			console.log("[WebRTC] Candidate received:", candidate);
-
 			await peer?.addIceCandidate(candidate);
 		});
 
@@ -92,12 +74,17 @@ export const useP2PSharing = (socket: SocketTyped | null) => {
 	}, [socket, createPeerConnection, peer]);
 
 	const connect = async (roomId: string) => {
-		createPeerConnection(roomId);
+		const pc = peer || createPeerConnection(roomId);
 
-		// const offer = await pc.createOffer();
-		// await pc.setLocalDescription(offer);
+		const channel = pc.createDataChannel(roomId);
+		channel.onopen = () => {
+			console.info("[P2P] DataChannel open:", channel);
+		};
 
-		// socket?.emit("file:offer", { roomId, sdp: offer });
+		const offer = await pc.createOffer();
+		await pc.setLocalDescription(offer);
+
+		socket?.emit("file:offer", { roomId, sdp: offer });
 	};
 
 	return {

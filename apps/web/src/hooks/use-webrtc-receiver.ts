@@ -57,7 +57,8 @@ export function useWebRtcReceiver(peer: RTCPeerConnection | null) {
 						const channel = channelsRef.current.get(msg.id);
 						if (channel) {
 							sendMessage(channel, { type: "CANCEL", id: msg.id });
-							updateItem(msg.id, { status: "cancelled" });
+							setItems((prev) => prev.filter((i) => i.id !== msg.id));
+							tasksRef.current.delete(msg.id);
 						}
 					},
 					remove: () => {
@@ -66,6 +67,12 @@ export function useWebRtcReceiver(peer: RTCPeerConnection | null) {
 					},
 				};
 				setItems((prev) => [...prev, item]);
+			}
+
+			if (msg.type === "CANCEL") {
+				setItems((prev) => prev.filter((i) => i.id !== msg.id));
+				channel.close();
+				tasksRef.current.delete(msg.id);
 			}
 
 			if (msg.type === "EOF") {
@@ -105,7 +112,7 @@ export function useWebRtcReceiver(peer: RTCPeerConnection | null) {
 		if (!peer) return;
 
 		peer.ondatachannel = (e) => {
-			console.log("[DEBUG] Channel:", e.channel);
+			console.log("[Receiver] Channel received:", e.channel);
 			const channel = e.channel;
 			const id = channel.label;
 
@@ -122,6 +129,8 @@ export function useWebRtcReceiver(peer: RTCPeerConnection | null) {
 			};
 
 			channel.onclose = () => {
+				console.log("[Receiver] Closed:", channel.label);
+
 				channelsRef.current.delete(id);
 				tasksRef.current.delete(id);
 			};

@@ -11,6 +11,7 @@ export type UploadItem = {
 	error?: string;
 	cancel: () => void;
 	remove: () => void;
+	retry: () => void;
 };
 
 export type UploadTask = {
@@ -23,8 +24,14 @@ export type UploadTask = {
 };
 
 export interface UploadTransport {
-	upload(task: UploadTask, onProgress: (p: number) => void): Promise<void>;
-	cancel(taskId: string): void;
+	upload(
+		task: UploadTask,
+		options: {
+			onProgress: (p: number) => void;
+			onCancel: () => void;
+			onError: () => void;
+		},
+	): Promise<void>;
 }
 
 export type UploadQueueOptions = {
@@ -80,10 +87,12 @@ export function useUploadQueue(
 			await upload(task);
 			updateItems(task.id, { status: "done", progress: 100 });
 		} catch (error) {
-			console.log("[DEBUG] queue error", error);
+			console.log("[Queue] Error:", error);
 			if (task.controller.signal.aborted) {
 				updateItems(task.id, { status: "cancelled" });
-			} else if (opts.autoRetry && task.retries < task.maxRetries) {
+				return;
+			}
+			if (opts.autoRetry && task.retries < task.maxRetries) {
 				// Auto-retry
 				task.retries++;
 				updateItems(task.id, {
@@ -93,12 +102,12 @@ export function useUploadQueue(
 				});
 				await delay(Math.min(1000 * 2 ** task.retries, 10000));
 				requeue(task);
-			} else {
-				updateItems(task.id, {
-					status: "error",
-					error: error instanceof Error ? error.message : String(error),
-				});
+				return;
 			}
+			updateItems(task.id, {
+				status: "error",
+				error: error instanceof Error ? error.message : String(error),
+			});
 		} finally {
 			activeRef.current--;
 			cleanup();
@@ -109,7 +118,11 @@ export function useUploadQueue(
 
 	//#region HELPERS
 	const upload = (task: UploadTask) =>
-		transport.upload(task, (progress) => updateItems(task.id, { progress }));
+		transport.upload(task, {
+			onProgress: (progress) => updateItems(task.id, { progress }),
+			onCancel: () => updateItems(task.id, { status: "cancelled" }),
+			onError: () => updateItems(task.id, { status: "error" }),
+		});
 
 	const requeue = (task: UploadTask) => {
 		queueRef.current.push(task);
@@ -141,7 +154,7 @@ export function useUploadQueue(
 	//#region PUBLIC API
 	const addFiles = (files: File[], options?: UploadTaskOptions) => {
 		const taskOptions = { ...DEFAULT_TASK_OPTIONS, ...options };
-		files.forEach((file) => {
+		files.forEach((file, index) => {
 			const id = randomText({ prefix: "upload_" });
 			const controller = new AbortController();
 
@@ -151,19 +164,25 @@ export function useUploadQueue(
 				controller,
 				retries: 0,
 				...taskOptions,
+				priority: taskOptions.priority || index,
 			};
 
 			queueRef.current.push(task);
 			sortQueue();
 
-			updateItems(id, {
+			const item: UploadItem = {
 				id,
 				file,
 				progress: 0,
 				status: "waiting",
 				cancel: () => controller.abort(),
 				remove: () => removeItem(id),
-			});
+				retry: () => {
+					addFiles([file]);
+					removeItem(id);
+				},
+			};
+			setItems((prev) => [...prev, item]);
 
 			process();
 		});

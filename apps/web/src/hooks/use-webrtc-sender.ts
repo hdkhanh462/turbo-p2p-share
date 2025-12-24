@@ -9,8 +9,9 @@ type SenderOptions = {
 	speedLimit?: number;
 };
 
-const DEFAULT_SENDER_OPTIONS: Required<Pick<SenderOptions, "chunkSize">> = {
-	chunkSize: 16 * 1024, // 16KB
+const DEFAULT_SENDER_OPTIONS: Required<SenderOptions> = {
+	chunkSize: 64 * 1024, // 64KB
+	speedLimit: 64 * 2 * 1024, // 128KB
 };
 
 export function useWebRtcSender(
@@ -23,22 +24,19 @@ export function useWebRtcSender(
 	//#region HELPERS
 	const waitBufferedLow = (channel: RTCDataChannel) =>
 		new Promise<void>((resolve) => {
-			channel.bufferedAmountLowThreshold = 2 * opts.chunkSize;
+			channel.bufferedAmountLowThreshold = opts.speedLimit;
 			channel.onbufferedamountlow = () => resolve();
 		});
 	//#endregion
 
 	//#region PUBLIC API
-	const upload: UploadTransport["upload"] = async (task, onProgress) => {
+	const upload: UploadTransport["upload"] = async (task, options) => {
 		if (!peer) throw new Error("Not connected");
 
 		const channel = peer.createDataChannel(task.id);
 		channel.binaryType = "arraybuffer";
-		if (opts.speedLimit) channel.bufferedAmountLowThreshold = opts.speedLimit;
 
 		channelsRef.current.set(task.id, channel);
-
-		console.log("[DEBUG] Channel open:", channel);
 
 		const total = task.file.size;
 		let offset = 0;
@@ -55,37 +53,51 @@ export function useWebRtcSender(
 					},
 				});
 
-				console.log("[DEBUG] Send meta");
+				console.log("[Sender] Sending file:", task.file);
 
-				while (offset < total) {
-					const chunk = task.file.slice(offset, offset + opts.chunkSize);
-					const buffer = await chunk.arrayBuffer();
+				try {
+					while (offset < total) {
+						if (task.controller.signal.aborted) {
+							throw new DOMException("Canceled", "AbortError");
+						}
 
-					channel.send(buffer);
-					offset += opts.chunkSize;
+						const chunk = task.file.slice(offset, offset + opts.chunkSize);
+						const buffer = await chunk.arrayBuffer();
 
-					onProgress(Math.round((offset / total) * 100));
+						channel.send(buffer);
+						offset += opts.chunkSize;
 
-					// backpressure
-					if (channel.bufferedAmount > 4 * opts.chunkSize) {
-						await waitBufferedLow(channel);
+						options.onProgress(Math.round((offset / total) * 100));
+
+						// backpressure
+						if (channel.bufferedAmount > 4 * opts.chunkSize) {
+							await waitBufferedLow(channel);
+						}
 					}
+				} catch (error) {
+					if (error instanceof DOMException && error.name === "AbortError") {
+						sendMessage(channel, { type: "CANCEL", id: task.id });
+						reject("Cancelled by sender");
+						return;
+					}
+
+					reject(error);
 				}
 
 				sendMessage(channel, { type: "EOF", id: task.id });
-				console.log("[DEBUG] Send EOF");
+				console.log("[Sender] Sending file completed:", task.id);
 			};
 
 			channel.onmessage = (ev) => {
 				if (typeof ev.data === "string") {
 					const msg: ChannelMessage = JSON.parse(ev.data);
-					console.log("[DEBUG] onmessage:", msg);
+					console.log("[Sender] Message received:", msg);
 
 					if (task.id !== msg.id) return;
 
 					if (msg.type === "CANCEL") {
-						channel.close();
-						reject("cancelled by receiver");
+						task.controller.abort();
+						reject("Cancelled by receiver");
 					}
 
 					if (msg.type === "ACK") {
@@ -95,19 +107,11 @@ export function useWebRtcSender(
 				}
 			};
 
-			channel.onerror = () => reject("WebRTC error");
-
-			task.controller.signal.addEventListener("abort", () => {
-				channel.close();
-				reject("cancelled");
-			});
+			channel.onerror = () => reject("[Sender] Channel error");
+			channel.onclose = () => console.log("[Sender] Closed:", channel.label);
 		});
-	};
-
-	const cancel: UploadTransport["cancel"] = (taskId) => {
-		channelsRef.current.get(taskId)?.close();
 	};
 	//#endregion
 
-	return { upload, cancel };
+	return { upload };
 }
