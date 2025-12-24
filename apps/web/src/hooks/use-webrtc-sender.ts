@@ -26,32 +26,10 @@ export function useWebRtcSender(
 			channel.bufferedAmountLowThreshold = 2 * opts.chunkSize;
 			channel.onbufferedamountlow = () => resolve();
 		});
-
-	function waitForOpen(channel: RTCDataChannel): Promise<void> {
-		if (channel.readyState === "open") return Promise.resolve();
-
-		return new Promise((resolve, reject) => {
-			const timeout = setTimeout(() => {
-				reject(new Error("DataChannel open timeout"));
-			}, 10000);
-
-			channel.onopen = () => {
-				clearTimeout(timeout);
-				resolve();
-			};
-
-			channel.onerror = () => {
-				clearTimeout(timeout);
-				reject(new Error("DataChannel error before open"));
-			};
-		});
-	}
-
 	//#endregion
 
 	//#region PUBLIC API
 	const upload: UploadTransport["upload"] = async (task, onProgress) => {
-		console.log("[Sender] Uploading:", { task, peer });
 		if (!peer) throw new Error("Not connected");
 
 		const channel = peer.createDataChannel(task.id);
@@ -60,9 +38,7 @@ export function useWebRtcSender(
 
 		channelsRef.current.set(task.id, channel);
 
-		console.log("[DEBUG] Channel:", { peer, channel });
-
-		await waitForOpen(channel);
+		console.log("[DEBUG] Channel open:", channel);
 
 		const total = task.file.size;
 		let offset = 0;
@@ -78,6 +54,8 @@ export function useWebRtcSender(
 						mime: task.file.type,
 					},
 				});
+
+				console.log("[DEBUG] Send meta");
 
 				while (offset < total) {
 					const chunk = task.file.slice(offset, offset + opts.chunkSize);
@@ -95,11 +73,14 @@ export function useWebRtcSender(
 				}
 
 				sendMessage(channel, { type: "EOF", id: task.id });
+				console.log("[DEBUG] Send EOF");
 			};
 
 			channel.onmessage = (ev) => {
 				if (typeof ev.data === "string") {
 					const msg: ChannelMessage = JSON.parse(ev.data);
+					console.log("[DEBUG] onmessage:", msg);
+
 					if (task.id !== msg.id) return;
 
 					if (msg.type === "CANCEL") {

@@ -105,6 +105,7 @@ export function useWebRtcReceiver(peer: RTCPeerConnection | null) {
 		if (!peer) return;
 
 		peer.ondatachannel = (e) => {
+			console.log("[DEBUG] Channel:", e.channel);
 			const channel = e.channel;
 			const id = channel.label;
 

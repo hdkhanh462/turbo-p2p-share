@@ -80,6 +80,7 @@ export function useUploadQueue(
 			await upload(task);
 			updateItems(task.id, { status: "done", progress: 100 });
 		} catch (error) {
+			console.log("[DEBUG] queue error", error);
 			if (task.controller.signal.aborted) {
 				updateItems(task.id, { status: "cancelled" });
 			} else if (opts.autoRetry && task.retries < task.maxRetries) {
@@ -151,8 +152,6 @@ export function useUploadQueue(
 				retries: 0,
 				...taskOptions,
 			};
-
-			console.log("[Upload] Task created:", task);
 
 			queueRef.current.push(task);
 			sortQueue();
