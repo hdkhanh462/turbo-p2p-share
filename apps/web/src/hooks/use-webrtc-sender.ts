@@ -30,7 +30,7 @@ export function useWebRtcSender(
 	//#endregion
 
 	//#region PUBLIC API
-	const upload: UploadTransport["upload"] = async (task, options) => {
+	const upload: UploadTransport["upload"] = async (task, onProgress) => {
 		if (!peer) throw new Error("Not connected");
 
 		const channel = peer.createDataChannel(task.id);
@@ -67,13 +67,16 @@ export function useWebRtcSender(
 						channel.send(buffer);
 						offset += opts.chunkSize;
 
-						options.onProgress(Math.round((offset / total) * 100));
+						onProgress(Math.round((offset / total) * 100));
 
 						// backpressure
 						if (channel.bufferedAmount > 4 * opts.chunkSize) {
 							await waitBufferedLow(channel);
 						}
 					}
+
+					sendMessage(channel, { type: "EOF", id: task.id });
+					console.log("[Sender] Sending file completed:", task.id);
 				} catch (error) {
 					if (error instanceof DOMException && error.name === "AbortError") {
 						sendMessage(channel, { type: "CANCEL", id: task.id });
@@ -83,9 +86,6 @@ export function useWebRtcSender(
 
 					reject(error);
 				}
-
-				sendMessage(channel, { type: "EOF", id: task.id });
-				console.log("[Sender] Sending file completed:", task.id);
 			};
 
 			channel.onmessage = (ev) => {

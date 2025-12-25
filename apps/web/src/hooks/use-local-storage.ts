@@ -10,23 +10,25 @@ import {
 
 export function useLocalStorage<T = null>(
 	key: string,
-	initialValue: T,
+	initialValue: T | (() => T),
 ): [T, Dispatch<SetStateAction<T>>] {
 	const readValue = useCallback((): T => {
 		if (typeof window === "undefined") {
 			console.error("[LocalStorage] Window is undefined");
-			return initialValue;
+			return initialValue instanceof Function ? initialValue() : initialValue;
 		}
 		try {
 			const item = window.localStorage.getItem(key);
 			if (!item) {
-				window.localStorage.setItem(key, JSON.stringify(initialValue));
-				return initialValue;
+				const toSave =
+					initialValue instanceof Function ? initialValue() : initialValue;
+				window.localStorage.setItem(key, JSON.stringify(toSave));
+				return toSave;
 			}
 			return JSON.parse(item) as T;
 		} catch (error) {
 			console.error(`[LocalStorage] Error reading key ${key}: `, error);
-			return initialValue;
+			return initialValue instanceof Function ? initialValue() : initialValue;
 		}
 	}, [key, initialValue]);
 
@@ -50,7 +52,11 @@ export function useLocalStorage<T = null>(
 			if (event instanceof StorageEvent) {
 				if (event.key !== key) return;
 				setStoredValue(
-					event.newValue ? JSON.parse(event.newValue) : initialValue,
+					event.newValue
+						? JSON.parse(event.newValue)
+						: initialValue instanceof Function
+							? initialValue()
+							: initialValue,
 				);
 			} else {
 				setStoredValue(readValue());

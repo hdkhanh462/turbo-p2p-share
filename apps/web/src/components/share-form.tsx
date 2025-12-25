@@ -103,7 +103,7 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 				</CardDescription>
 			</CardHeader>
 			<CardContent>
-				<form>
+				<form onSubmit={(e) => e.preventDefault()}>
 					<FieldGroup>
 						<div className="flex items-end gap-2">
 							<Controller

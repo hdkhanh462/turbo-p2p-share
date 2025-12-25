@@ -24,14 +24,7 @@ export type UploadTask = {
 };
 
 export interface UploadTransport {
-	upload(
-		task: UploadTask,
-		options: {
-			onProgress: (p: number) => void;
-			onCancel: () => void;
-			onError: () => void;
-		},
-	): Promise<void>;
+	upload(task: UploadTask, onProgress: (p: number) => void): Promise<void>;
 }
 
 export type UploadQueueOptions = {
@@ -118,11 +111,7 @@ export function useUploadQueue(
 
 	//#region HELPERS
 	const upload = (task: UploadTask) =>
-		transport.upload(task, {
-			onProgress: (progress) => updateItems(task.id, { progress }),
-			onCancel: () => updateItems(task.id, { status: "cancelled" }),
-			onError: () => updateItems(task.id, { status: "error" }),
-		});
+		transport.upload(task, (progress) => updateItems(task.id, { progress }));
 
 	const requeue = (task: UploadTask) => {
 		queueRef.current.push(task);

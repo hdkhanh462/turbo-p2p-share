@@ -90,6 +90,7 @@ export function UploadFiles({ p2p: { senderItems, addFiles } }: Props) {
 								<>
 									{item.status === "uploading" && (
 										<Button
+											type="button"
 											variant="ghost"
 											size="icon"
 											className="size-7"
@@ -100,6 +101,7 @@ export function UploadFiles({ p2p: { senderItems, addFiles } }: Props) {
 									)}
 									{item.status === "waiting" && (
 										<Button
+											type="button"
 											variant="ghost"
 											size="icon"
 											className="size-7"
@@ -110,6 +112,7 @@ export function UploadFiles({ p2p: { senderItems, addFiles } }: Props) {
 									)}
 									{(item.status === "cancelled" || item.status === "error") && (
 										<Button
+											type="button"
 											variant="ghost"
 											size="icon"
 											className="size-7"
@@ -120,6 +123,7 @@ export function UploadFiles({ p2p: { senderItems, addFiles } }: Props) {
 									)}
 									{item.status !== "uploading" && (
 										<Button
+											type="button"
 											variant="ghost"
 											size="icon"
 											className="size-7"
