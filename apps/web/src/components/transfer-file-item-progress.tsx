@@ -10,7 +10,7 @@ interface Props extends React.HTMLAttributes<HTMLDivElement> {
 	forceMount?: boolean;
 }
 
-export function FileItemProgress(props: Props) {
+export function TransferFileItemProgress(props: Props) {
 	const {
 		progress,
 		variant = "linear",

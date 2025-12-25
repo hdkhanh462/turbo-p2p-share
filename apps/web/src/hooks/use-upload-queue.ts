@@ -7,6 +7,7 @@ export type UploadItem = {
 	id: string;
 	file: File;
 	progress: number;
+	speedMbps: number;
 	status: "waiting" | "uploading" | "done" | "error" | "cancelled";
 	error?: string;
 	cancel: () => void;
@@ -24,7 +25,10 @@ export type UploadTask = {
 };
 
 export interface UploadTransport {
-	upload(task: UploadTask, onProgress: (p: number) => void): Promise<void>;
+	upload(
+		task: UploadTask,
+		onProgress: (p: number, speedMbps: number) => void,
+	): Promise<void>;
 }
 
 export type UploadQueueOptions = {
@@ -74,21 +78,21 @@ export function useUploadQueue(
 	};
 
 	const run = async (task: UploadTask) => {
-		updateItems(task.id, { status: "uploading" });
+		updateItem(task.id, { status: "uploading" });
 
 		try {
 			await upload(task);
-			updateItems(task.id, { status: "done", progress: 100 });
+			updateItem(task.id, { status: "done", progress: 100 });
 		} catch (error) {
 			console.log("[Queue] Error:", error);
 			if (task.controller.signal.aborted) {
-				updateItems(task.id, { status: "cancelled" });
+				updateItem(task.id, { status: "cancelled" });
 				return;
 			}
 			if (opts.autoRetry && task.retries < task.maxRetries) {
 				// Auto-retry
 				task.retries++;
-				updateItems(task.id, {
+				updateItem(task.id, {
 					status: "waiting",
 					progress: 0,
 					error: `Retrying... (${task.retries})`,
@@ -97,7 +101,7 @@ export function useUploadQueue(
 				requeue(task);
 				return;
 			}
-			updateItems(task.id, {
+			updateItem(task.id, {
 				status: "error",
 				error: error instanceof Error ? error.message : String(error),
 			});
@@ -111,7 +115,9 @@ export function useUploadQueue(
 
 	//#region HELPERS
 	const upload = (task: UploadTask) =>
-		transport.upload(task, (progress) => updateItems(task.id, { progress }));
+		transport.upload(task, (progress, speedMbps) =>
+			updateItem(task.id, { progress, speedMbps }),
+		);
 
 	const requeue = (task: UploadTask) => {
 		queueRef.current.push(task);
@@ -131,12 +137,35 @@ export function useUploadQueue(
 		}
 	};
 
-	const updateItems = (id: string, item: Partial<UploadItem>) => {
+	const updateItem = (id: string, item: Partial<UploadItem>) => {
 		setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...item } : i)));
 	};
 
-	const removeItem = (id: string) => {
+	const removeTask = (id: string) => {
+		const task = queueRef.current.find((t) => t.id === id);
+		if (!task) return;
+
+		task.controller.abort();
+
+		queueRef.current = queueRef.current.filter((t) => t.id !== id);
 		setItems((prev) => prev.filter((i) => i.id !== id));
+	};
+
+	const retryTask = (task: UploadTask) => {
+		const controller = new AbortController();
+
+		requeue({
+			...task,
+			controller,
+			retries: 0,
+		});
+		updateItem(task.id, {
+			status: "waiting",
+			progress: 0,
+			error: undefined,
+			cancel: () => controller.abort(),
+		});
+		process();
 	};
 	//#endregion
 
@@ -153,7 +182,7 @@ export function useUploadQueue(
 				controller,
 				retries: 0,
 				...taskOptions,
-				priority: taskOptions.priority || index,
+				priority: taskOptions.priority ?? index,
 			};
 
 			queueRef.current.push(task);
@@ -163,13 +192,11 @@ export function useUploadQueue(
 				id,
 				file,
 				progress: 0,
+				speedMbps: 0,
 				status: "waiting",
 				cancel: () => controller.abort(),
-				remove: () => removeItem(id),
-				retry: () => {
-					addFiles([file]);
-					removeItem(id);
-				},
+				remove: () => removeTask(id),
+				retry: () => retryTask(task),
 			};
 			setItems((prev) => [...prev, item]);
 

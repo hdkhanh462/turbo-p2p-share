@@ -1,5 +1,5 @@
 import * as React from "react";
-import { FileItemProgress } from "@/components/file-download-item-progress";
+import { TransferFileItemProgress } from "@/components/transfer-file-item-progress";
 import { formatBytes, getFileIcon } from "@/components/ui/file-upload";
 import type { UploadItem } from "@/hooks/use-upload-queue";
 import type { ReceiveItem } from "@/hooks/use-webrtc-receiver";
@@ -55,7 +55,10 @@ export function TransferFileItem({ data, action }: Props) {
 				<div className="flex min-w-0 flex-1 flex-col">
 					<span className="truncate font-medium text-sm">{meta.name}</span>
 					<span className="truncate text-muted-foreground text-xs">
-						{formatBytes(meta.size)}
+						{formatBytes(meta.size)}{" "}
+						{(data.item.status === "uploading" ||
+							data.item.status === "receiving") &&
+							`- ${data.item.speedMbps.toString().padStart(2, "0")}Mbps`}
 					</span>
 				</div>
 
@@ -66,7 +69,7 @@ export function TransferFileItem({ data, action }: Props) {
 			{/* Progress */}
 			{(data.item.status === "uploading" ||
 				data.item.status === "receiving") && (
-				<FileItemProgress progress={data.item.progress} />
+				<TransferFileItemProgress progress={data.item.progress} />
 			)}
 		</div>
 	);

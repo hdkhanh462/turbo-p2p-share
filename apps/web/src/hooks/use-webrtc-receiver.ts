@@ -7,6 +7,7 @@ export type ReceiveItem = {
 	id: string;
 	meta: FileMeta;
 	progress: number;
+	speedMbps: number;
 	status: "receiving" | "done" | "error" | "cancelled";
 	file?: File;
 	cancel: () => void;
@@ -18,6 +19,10 @@ type ReceiveTask = {
 	meta: FileMeta;
 	received: number;
 	chunks: ArrayBuffer[];
+
+	windowBytes: number;
+	startTime: number;
+	lastTick: number;
 };
 
 export function useWebRtcReceiver(peer: RTCPeerConnection | null) {
@@ -41,17 +46,23 @@ export function useWebRtcReceiver(peer: RTCPeerConnection | null) {
 			if (channel.label !== msg.id) return;
 
 			if (msg.type === "META") {
+				const now = performance.now();
 				tasksRef.current.set(msg.id, {
 					id: msg.id,
 					meta: msg.meta,
 					received: 0,
 					chunks: [],
+
+					windowBytes: 0,
+					startTime: now,
+					lastTick: now,
 				});
 
 				const item: ReceiveItem = {
 					id: msg.id,
 					meta: msg.meta,
 					progress: 0,
+					speedMbps: 0,
 					status: "receiving",
 					cancel: () => {
 						const channel = channelsRef.current.get(msg.id);
@@ -99,9 +110,25 @@ export function useWebRtcReceiver(peer: RTCPeerConnection | null) {
 			task.chunks.push(data);
 			task.received += data.byteLength;
 
+			task.windowBytes += data.byteLength;
+			const now = performance.now();
+			let speedMbps: number | undefined;
+
+			if (now - task.lastTick >= 1000) {
+				const elapsedSec = (now - task.lastTick) / 1000;
+				const speedBps = task.windowBytes / elapsedSec;
+				speedMbps = Math.round((speedBps * 8) / (1024 * 1024));
+
+				task.windowBytes = 0;
+				task.lastTick = now;
+			}
+
 			const progress = Math.round((task.received / task.meta.size) * 100);
 
-			updateItem(channel.label, { progress });
+			updateItem(channel.label, {
+				progress,
+				...(speedMbps !== undefined && { speedMbps }),
+			});
 		},
 		[updateItem],
 	);

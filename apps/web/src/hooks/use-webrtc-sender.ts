@@ -6,12 +6,12 @@ import { sendMessage } from "@/utils/webrtc";
 
 type SenderOptions = {
 	chunkSize?: number;
-	speedLimit?: number;
+	maxBufferedAmount?: number;
 };
 
 const DEFAULT_SENDER_OPTIONS: Required<SenderOptions> = {
-	chunkSize: 64 * 1024, // 64KB
-	speedLimit: 64 * 2 * 1024, // 128KB
+	chunkSize: 256 * 1024,
+	maxBufferedAmount: 512 * 1024,
 };
 
 export function useWebRtcSender(
@@ -24,7 +24,6 @@ export function useWebRtcSender(
 	//#region HELPERS
 	const waitBufferedLow = (channel: RTCDataChannel) =>
 		new Promise<void>((resolve) => {
-			channel.bufferedAmountLowThreshold = opts.speedLimit;
 			channel.onbufferedamountlow = () => resolve();
 		});
 	//#endregion
@@ -35,11 +34,15 @@ export function useWebRtcSender(
 
 		const channel = peer.createDataChannel(task.id);
 		channel.binaryType = "arraybuffer";
+		channel.bufferedAmountLowThreshold = opts.maxBufferedAmount;
 
 		channelsRef.current.set(task.id, channel);
 
 		const total = task.file.size;
 		let offset = 0;
+
+		const startTime = performance.now();
+		let sentBytes = 0;
 
 		return new Promise<void>((resolve, reject) => {
 			channel.onopen = async () => {
@@ -67,10 +70,16 @@ export function useWebRtcSender(
 						channel.send(buffer);
 						offset += opts.chunkSize;
 
-						onProgress(Math.round((offset / total) * 100));
+						sentBytes += buffer.byteLength;
+
+						const elapsedSec = (performance.now() - startTime) / 1000;
+						const speedBps = sentBytes / elapsedSec;
+						const speedMbps = Math.round((speedBps * 8) / (1024 * 1024));
+
+						onProgress(Math.round((offset / total) * 100), speedMbps);
 
 						// backpressure
-						if (channel.bufferedAmount > 4 * opts.chunkSize) {
+						if (channel.bufferedAmount > opts.maxBufferedAmount) {
 							await waitBufferedLow(channel);
 						}
 					}
@@ -107,7 +116,7 @@ export function useWebRtcSender(
 				}
 			};
 
-			channel.onerror = () => reject("[Sender] Channel error");
+			channel.onerror = (e) => reject(e);
 			channel.onclose = () => console.log("[Sender] Closed:", channel.label);
 		});
 	};

@@ -15,6 +15,7 @@ import {
 	type FileUploadProps,
 } from "@/components/ui/file-upload";
 import type { useP2PSharing } from "@/hooks/use-p2p-sharing";
+import type { UploadItem } from "@/hooks/use-upload-queue";
 
 const MAX_FILES = 5;
 
@@ -24,6 +25,13 @@ type Props = {
 
 export function UploadFiles({ p2p: { senderItems, addFiles } }: Props) {
 	const [files, setFiles] = useState<File[]>([]);
+	const uploadingItems = senderItems.filter(
+		(item) => item.status === "uploading",
+	);
+	const waitingItems = senderItems.filter((item) => item.status === "waiting");
+	const completedOrCancelledItems = senderItems.filter(
+		(item) => item.status !== "uploading" && item.status !== "waiting",
+	);
 
 	const onSingleUpload = async (file: File) => {
 		if (!file) return;
@@ -75,67 +83,58 @@ export function UploadFiles({ p2p: { senderItems, addFiles } }: Props) {
 					</div>
 				</FileUploadDropzone>
 				<FileList>
-					{/* {files.map((file) => (
-						<FileItem
-							key={`${file.name}-${file.lastModified}`}
-							file={file}
-							onSingleUpload={onSingleUpload}
-						/>
-					))} */}
-					{senderItems.map((item) => (
-						<TransferFileItem
-							key={item.id}
-							data={{ type: "upload", item: item }}
-							action={
-								<>
-									{item.status === "uploading" && (
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											className="size-7"
-											onClick={() => item.cancel()}
-										>
-											<BanIcon />
-										</Button>
-									)}
-									{item.status === "waiting" && (
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											className="size-7"
-											onClick={() => onSingleUpload(item.file)}
-										>
-											<UploadIcon />
-										</Button>
-									)}
-									{(item.status === "cancelled" || item.status === "error") && (
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											className="size-7"
-											onClick={() => item.retry()}
-										>
-											<RefreshCcwIcon />
-										</Button>
-									)}
-									{item.status !== "uploading" && (
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											className="size-7"
-											onClick={() => item.remove()}
-										>
-											<XIcon />
-										</Button>
-									)}
-								</>
-							}
-						/>
-					))}
+					{files.length > 0 && (
+						<>
+							<div className="font-medium text-sm leading-snug">
+								Selected files
+							</div>
+							{files.map((file) => (
+								<FileItem
+									key={`${file.name}-${file.lastModified}`}
+									file={file}
+									onSingleUpload={onSingleUpload}
+								/>
+							))}
+						</>
+					)}
+					{uploadingItems.length > 0 && (
+						<>
+							<div className="font-medium text-sm leading-snug">Uploading</div>
+							{uploadingItems.map((item) => (
+								<SenderItem
+									key={item.id}
+									item={item}
+									onSingleUpload={onSingleUpload}
+								/>
+							))}
+						</>
+					)}
+					{waitingItems.length > 0 && (
+						<>
+							<div className="font-medium text-sm leading-snug">In-queue</div>
+							{waitingItems.map((item) => (
+								<SenderItem
+									key={item.id}
+									item={item}
+									onSingleUpload={onSingleUpload}
+								/>
+							))}
+						</>
+					)}
+					{completedOrCancelledItems.length > 0 && (
+						<>
+							<div className="font-medium text-sm leading-snug">
+								Completed or Cancelled
+							</div>
+							{completedOrCancelledItems.map((item) => (
+								<SenderItem
+									key={item.id}
+									item={item}
+									onSingleUpload={onSingleUpload}
+								/>
+							))}
+						</>
+					)}
 				</FileList>
 			</FileUpload>
 		</Field>
@@ -169,5 +168,68 @@ function FileItem({
 				</FileUploadItemDelete>
 			</div>
 		</FileUploadItem>
+	);
+}
+
+function SenderItem({
+	item,
+	onSingleUpload,
+}: {
+	item: UploadItem;
+	onSingleUpload: (file: File) => void;
+}) {
+	return (
+		<TransferFileItem
+			key={item.id}
+			data={{ type: "upload", item: item }}
+			action={
+				<>
+					{item.status === "uploading" && (
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon"
+							className="size-7"
+							onClick={() => item.cancel()}
+						>
+							<BanIcon />
+						</Button>
+					)}
+					{item.status === "waiting" && (
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon"
+							className="size-7"
+							onClick={() => onSingleUpload(item.file)}
+						>
+							<UploadIcon />
+						</Button>
+					)}
+					{(item.status === "cancelled" || item.status === "error") && (
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon"
+							className="size-7"
+							onClick={() => item.retry()}
+						>
+							<RefreshCcwIcon />
+						</Button>
+					)}
+					{item.status !== "uploading" && (
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon"
+							className="size-7"
+							onClick={() => item.remove()}
+						>
+							<XIcon />
+						</Button>
+					)}
+				</>
+			}
+		/>
 	);
 }
