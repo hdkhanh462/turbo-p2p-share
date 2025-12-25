@@ -41,9 +41,6 @@ export function useWebRtcSender(
 		const total = task.file.size;
 		let offset = 0;
 
-		const startTime = performance.now();
-		let sentBytes = 0;
-
 		return new Promise<void>((resolve, reject) => {
 			channel.onopen = async () => {
 				sendMessage(channel, {
@@ -70,11 +67,18 @@ export function useWebRtcSender(
 						channel.send(buffer);
 						offset += opts.chunkSize;
 
-						sentBytes += buffer.byteLength;
+						task.windowBytes += buffer.byteLength;
+						const now = performance.now();
 
-						const elapsedSec = (performance.now() - startTime) / 1000;
-						const speedBps = sentBytes / elapsedSec;
-						const speedMbps = Math.round((speedBps * 8) / (1024 * 1024));
+						let speedMbps: number | undefined;
+
+						if (now - task.lastTick >= 1000) {
+							const speedBps =
+								task.windowBytes / ((now - task.lastTick) / 1000);
+							speedMbps = Math.round((speedBps * 8) / (1024 * 1024));
+							task.windowBytes = 0;
+							task.lastTick = now;
+						}
 
 						onProgress(Math.round((offset / total) * 100), speedMbps);
 

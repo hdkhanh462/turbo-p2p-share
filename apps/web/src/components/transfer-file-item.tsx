@@ -1,3 +1,4 @@
+import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import * as React from "react";
 import { TransferFileItemProgress } from "@/components/transfer-file-item-progress";
 import { formatBytes, getFileIcon } from "@/components/ui/file-upload";
@@ -54,12 +55,21 @@ export function TransferFileItem({ data, action }: Props) {
 				{/* Metadata */}
 				<div className="flex min-w-0 flex-1 flex-col">
 					<span className="truncate font-medium text-sm">{meta.name}</span>
-					<span className="truncate text-muted-foreground text-xs">
-						{formatBytes(meta.size)}{" "}
-						{(data.item.status === "uploading" ||
-							data.item.status === "receiving") &&
-							`- ${data.item.speedMbps.toString().padStart(2, "0")}Mbps`}
-					</span>
+					<div className="flex w-full items-center gap-0.5 truncate text-muted-foreground text-xs">
+						{formatBytes(meta.size)}
+						{data.item.status === "uploading" && (
+							<>
+								<ArrowUpIcon className="size-3.5" />
+								<div>{`${data.item.speedMbps}Mbps`}</div>
+							</>
+						)}
+						{data.item.status === "receiving" && (
+							<>
+								<ArrowDownIcon className="size-3.5" />
+								<div>{`${data.item.speedMbps}Mbps`}</div>
+							</>
+						)}
+					</div>
 				</div>
 
 				{/* Action */}

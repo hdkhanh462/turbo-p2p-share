@@ -22,12 +22,16 @@ export type UploadTask = {
 	retries: number;
 	maxRetries: number;
 	controller: AbortController;
+
+	windowBytes: number;
+	startTime: number;
+	lastTick: number;
 };
 
 export interface UploadTransport {
 	upload(
 		task: UploadTask,
-		onProgress: (p: number, speedMbps: number) => void,
+		onProgress: (p: number, speedMbps?: number) => void,
 	): Promise<void>;
 }
 
@@ -116,7 +120,10 @@ export function useUploadQueue(
 	//#region HELPERS
 	const upload = (task: UploadTask) =>
 		transport.upload(task, (progress, speedMbps) =>
-			updateItem(task.id, { progress, speedMbps }),
+			updateItem(task.id, {
+				progress,
+				...(speedMbps !== undefined && { speedMbps }),
+			}),
 		);
 
 	const requeue = (task: UploadTask) => {
@@ -175,12 +182,16 @@ export function useUploadQueue(
 		files.forEach((file, index) => {
 			const id = randomText({ prefix: "upload_" });
 			const controller = new AbortController();
+			const now = performance.now();
 
 			const task: UploadTask = {
 				id,
 				file,
 				controller,
 				retries: 0,
+				windowBytes: 0,
+				startTime: now,
+				lastTick: now,
 				...taskOptions,
 				priority: taskOptions.priority ?? index,
 			};
