@@ -1,5 +1,3 @@
-"use client";
-
 import {
 	createContext,
 	type ReactNode,
@@ -18,23 +16,25 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { ButtonProps } from "@/components/ui/button";
+import type { Button } from "@/components/ui/button";
 
 export type AlertDialogOptions = {
 	title: string;
 	description?: string;
 	cancel?: {
 		label?: string;
-		props?: ButtonProps;
+		props?: Parameters<typeof Button>[0];
 	};
 	action?: {
 		label?: string;
-		props?: ButtonProps;
+		props?: Parameters<typeof Button>[0];
 	};
 };
 
 type AlertDialogContextType = {
+	open: boolean;
 	alert: (options: AlertDialogOptions) => Promise<boolean>;
+	close: () => void;
 };
 
 const AlertDialogContext = createContext<AlertDialogContextType | null>(null);
@@ -55,6 +55,11 @@ export function AlertDialogProvider({ children }: { children: ReactNode }) {
 		});
 	}, []);
 
+	const close = useCallback(() => {
+		setOpen(false);
+		setOptions(null);
+	}, []);
+
 	const handleClose = (result: boolean) => {
 		setOpen(false);
 		resolver?.(result);
@@ -64,7 +69,7 @@ export function AlertDialogProvider({ children }: { children: ReactNode }) {
 	};
 
 	return (
-		<AlertDialogContext.Provider value={{ alert }}>
+		<AlertDialogContext.Provider value={{ open, alert, close }}>
 			{children}
 
 			{options && (

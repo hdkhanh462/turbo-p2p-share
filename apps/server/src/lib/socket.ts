@@ -34,17 +34,34 @@ export function setupSocket(server: HttpServer) {
 			socket.emit("room:create", { roomId });
 		});
 
-		socket.on("room:join", ({ roomId }) => {
-			console.log("[Room] Joining:", roomId);
+		socket.on("room:request", ({ roomId }) => {
+			console.log("[Room] Requesting:", roomId);
+
+			const room = io.sockets.adapter.rooms.get(roomId);
+			const memberCount = room?.size ?? 0;
+
+			if (memberCount >= 2) {
+				console.log("[Room] Full:", roomId);
+
+				io.to(socket.id).emit("room:reject", {
+					roomId,
+					reason: "ROOM_FULL",
+				});
+				return;
+			}
 
 			socket.join(roomId);
-			socket.emit("room:join", { roomId });
+			socket.to(roomId).emit("room:request", { roomId, userId: socket.id });
 		});
 
-		socket.on("room:request", (payload) => {
-			console.log("[Room] Requesting:", payload);
+		socket.on("room:request-cancel", ({ roomId }) => {
+			console.log("[Room] Request cancelled:", roomId);
+			socket.leave(roomId);
 
-			socket.to(payload.roomId).emit("room:request", payload);
+			socket.to(roomId).emit("room:request-cancel", {
+				roomId,
+				userId: socket.id,
+			});
 		});
 
 		socket.on("room:accept", (payload) => {
@@ -53,14 +70,13 @@ export function setupSocket(server: HttpServer) {
 			io.to(payload.roomId).emit("room:accept", payload);
 		});
 
-		socket.on("room:reject", ({ roomId, userId }) => {
-			console.log("[Room] Rejecting:", { roomId, userId });
+		socket.on("room:reject", ({ roomId, userId, reason }) => {
+			console.log("[Room] Rejecting:", roomId);
 
 			const targetSocket = io.sockets.sockets.get(userId);
-			if (targetSocket) {
-				targetSocket.leave(roomId);
-			}
-			socket.to(userId).emit("room:reject", { roomId, userId: socket.id });
+			if (targetSocket) targetSocket.leave(roomId);
+
+			io.to(userId).emit("room:reject", { roomId, reason });
 		});
 
 		socket.on("room:terminate", (roomId) => {

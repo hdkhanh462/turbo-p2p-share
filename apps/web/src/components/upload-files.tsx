@@ -101,11 +101,7 @@ export function UploadFiles({ p2p: { senderItems, addFiles } }: Props) {
 						<>
 							<div className="font-medium text-sm leading-snug">Uploading</div>
 							{uploadingItems.map((item) => (
-								<SenderItem
-									key={item.id}
-									item={item}
-									onSingleUpload={onSingleUpload}
-								/>
+								<SenderItem key={item.id} item={item} />
 							))}
 						</>
 					)}
@@ -113,11 +109,7 @@ export function UploadFiles({ p2p: { senderItems, addFiles } }: Props) {
 						<>
 							<div className="font-medium text-sm leading-snug">In-queue</div>
 							{waitingItems.map((item) => (
-								<SenderItem
-									key={item.id}
-									item={item}
-									onSingleUpload={onSingleUpload}
-								/>
+								<SenderItem key={item.id} item={item} />
 							))}
 						</>
 					)}
@@ -127,11 +119,7 @@ export function UploadFiles({ p2p: { senderItems, addFiles } }: Props) {
 								Completed or Cancelled
 							</div>
 							{completedOrCancelledItems.map((item) => (
-								<SenderItem
-									key={item.id}
-									item={item}
-									onSingleUpload={onSingleUpload}
-								/>
+								<SenderItem key={item.id} item={item} />
 							))}
 						</>
 					)}
@@ -171,13 +159,7 @@ function FileItem({
 	);
 }
 
-function SenderItem({
-	item,
-	onSingleUpload,
-}: {
-	item: UploadItem;
-	onSingleUpload: (file: File) => void;
-}) {
+function SenderItem({ item }: { item: UploadItem }) {
 	return (
 		<TransferFileItem
 			key={item.id}
@@ -193,17 +175,6 @@ function SenderItem({
 							onClick={() => item.cancel()}
 						>
 							<BanIcon />
-						</Button>
-					)}
-					{item.status === "waiting" && (
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon"
-							className="size-7"
-							onClick={() => onSingleUpload(item.file)}
-						>
-							<UploadIcon />
 						</Button>
 					)}
 					{(item.status === "cancelled" || item.status === "error") && (

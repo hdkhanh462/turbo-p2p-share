@@ -6,10 +6,12 @@ import type { SocketTyped } from "@/hooks/use-socket";
 
 type RoomOptions = {
 	onRoomCreated?: ServerToClientHandlers["room:create"];
-	onRoomJoined?: ServerToClientHandlers["room:join"];
 	onRoomRequested?: (
 		payload: Parameters<ServerToClientHandlers["room:request"]>[0],
 		accept: boolean,
+	) => void;
+	onRoomRequestCancelled?: (
+		payload: Parameters<ServerToClientHandlers["room:request-cancel"]>[0],
 	) => void;
 	onRoomAccepted?: ServerToClientHandlers["room:accept"];
 	onRoomRejected?: ServerToClientHandlers["room:reject"];
@@ -23,7 +25,7 @@ export const useRoomSocket = (
 	const [connecting, setConnecting] = useState(false);
 	const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
 
-	const { alert } = useAlertDialog();
+	const { alert, close } = useAlertDialog();
 
 	//#region HANDLERS
 	const handleRoomCreated: ServerToClientHandlers["room:create"] = useCallback(
@@ -33,33 +35,48 @@ export const useRoomSocket = (
 		[options],
 	);
 
-	const handleRoomJoined: ServerToClientHandlers["room:join"] = useCallback(
-		(payload) => {
-			options?.onRoomJoined?.(payload);
-		},
-		[options],
-	);
-
 	const handleRoomRequested: ServerToClientHandlers["room:request"] =
 		useCallback(
-			async (payload) => {
+			async ({ roomId, userId }) => {
+				if (currentRoomId) {
+					socket?.emit("room:reject", {
+						roomId,
+						userId,
+						reason: "HOST_BUSY",
+					});
+					return;
+				}
 				const accept = await alert({
 					title: "Join Request",
-					description: `User ${payload.userId} wants to join your room.`,
+					description: `User ${userId} wants to join your room.`,
 					cancel: { label: "Reject", props: { variant: "destructive" } },
 					action: { label: "Accept" },
 				});
 				if (!accept) {
-					socket?.emit("room:reject", payload);
-					options?.onRoomRequested?.(payload, accept);
+					socket?.emit("room:reject", {
+						roomId,
+						userId,
+						reason: "HOST_REJECTED",
+					});
+					options?.onRoomRequested?.({ roomId, userId }, accept);
 					return;
 				}
 
-				options?.onRoomRequested?.(payload, accept);
+				options?.onRoomRequested?.({ roomId, userId }, accept);
 
-				socket?.emit("room:accept", { roomId: payload.roomId });
+				socket?.emit("room:accept", { roomId });
 			},
-			[socket, options, alert],
+			[socket, options, alert, currentRoomId],
+		);
+
+	const handleRoomeRequestCancelled: ServerToClientHandlers["room:request-cancel"] =
+		useCallback(
+			(payload) => {
+				setConnecting(false);
+				close();
+				options?.onRoomRequestCancelled?.(payload);
+			},
+			[options, close],
 		);
 
 	const handleAccepted: ServerToClientHandlers["room:accept"] = useCallback(
@@ -89,16 +106,16 @@ export const useRoomSocket = (
 
 	useEffect(() => {
 		socket?.on("room:create", handleRoomCreated);
-		socket?.on("room:join", handleRoomJoined);
 		socket?.on("room:request", handleRoomRequested);
+		socket?.on("room:request-cancel", handleRoomeRequestCancelled);
 		socket?.on("room:accept", handleAccepted);
 		socket?.on("room:reject", handleRejected);
 		socket?.on("room:terminate", handleTerminated);
 
 		return () => {
 			socket?.off("room:create", handleRoomCreated);
-			socket?.off("room:join", handleRoomJoined);
 			socket?.off("room:request", handleRoomRequested);
+			socket?.off("room:request-cancel", handleRoomeRequestCancelled);
 			socket?.off("room:accept", handleAccepted);
 			socket?.off("room:reject", handleRejected);
 			socket?.off("room:terminate", handleTerminated);
@@ -106,8 +123,8 @@ export const useRoomSocket = (
 	}, [
 		socket,
 		handleRoomCreated,
-		handleRoomJoined,
 		handleRoomRequested,
+		handleRoomeRequestCancelled,
 		handleAccepted,
 		handleRejected,
 		handleTerminated,
@@ -115,14 +132,15 @@ export const useRoomSocket = (
 
 	//#region PUBLIC API
 	const request = (roomId: string) => {
-		socket?.emit("room:join", { roomId });
-
 		if (!socket?.id) return;
-		socket?.emit("room:request", {
-			userId: socket.id,
-			roomId,
-		});
+		socket?.emit("room:request", { roomId });
 		setConnecting(true);
+	};
+
+	const cancelRequest = (roomId: string) => {
+		if (!socket?.id) return;
+		socket?.emit("room:request-cancel", { roomId });
+		setConnecting(false);
 	};
 
 	const terminate = () => {
@@ -132,5 +150,5 @@ export const useRoomSocket = (
 	};
 	//#endregion
 
-	return { connecting, currentRoomId, request, terminate };
+	return { connecting, currentRoomId, request, cancelRequest, terminate };
 };

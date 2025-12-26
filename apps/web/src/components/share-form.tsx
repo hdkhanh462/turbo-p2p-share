@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowUpRightFromSquareIcon } from "lucide-react";
+import { ArrowUpRightFromSquareIcon, PauseIcon } from "lucide-react";
 import { useEffect } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import z from "zod";
@@ -56,9 +56,8 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 		name: "partnerRoomId",
 	});
 
-	const { connecting, currentRoomId, request, terminate } = useRoomSocket(
-		socket,
-		{
+	const { connecting, currentRoomId, request, cancelRequest, terminate } =
+		useRoomSocket(socket, {
 			onRoomCreated: ({ roomId }) => {
 				console.log("[Room] Created:", roomId);
 
@@ -69,6 +68,9 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 
 				if (accept) p2p.connect(payload.roomId);
 			},
+			onRoomRequestCancelled: (payload) => {
+				console.log("[Room] Request cancelled:", payload);
+			},
 			onRoomTerminated: () => {
 				console.log("[Room] Terminated");
 
@@ -77,14 +79,10 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 			onRoomAccepted: (payload) => {
 				console.log("[Room] Accepted:", payload);
 			},
-			onRoomJoined: (payload) => {
-				console.log("[Room] Joined:", payload);
-			},
 			onRoomRejected: (payload) => {
 				console.log("[Room] Rejected: ", payload);
 			},
-		},
-	);
+		});
 
 	useEffect(() => {
 		socket?.emit("room:create", { roomId: myRoomId });
@@ -92,6 +90,10 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 
 	const handleRoomRequest = () => {
 		if (partnerRoomId) request(partnerRoomId);
+	};
+
+	const handleRoomRequestCancel = () => {
+		if (partnerRoomId) cancelRequest(partnerRoomId);
 	};
 
 	return (
@@ -141,6 +143,7 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 											placeholder="Enter Partner Room ID"
 											autoComplete="off"
 											showCopy={false}
+											readOnly={connecting || !!currentRoomId}
 											showPaste
 											showClear
 										/>
@@ -155,14 +158,26 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 									Terminate
 								</Button>
 							) : (
-								<Button
-									type="button"
-									disabled={connecting}
-									onClick={handleRoomRequest}
-								>
-									<Loader isLoading={connecting} />
-									Connect
-								</Button>
+								<div className="flex items-center gap-2">
+									{connecting && (
+										<Button
+											type="button"
+											variant="destructive"
+											size="icon"
+											onClick={handleRoomRequestCancel}
+										>
+											<PauseIcon />
+										</Button>
+									)}
+									<Button
+										type="button"
+										disabled={connecting}
+										onClick={handleRoomRequest}
+									>
+										<Loader isLoading={connecting} />
+										Connect
+									</Button>
+								</div>
 							)}
 						</div>
 						<UploadFiles p2p={p2p} />

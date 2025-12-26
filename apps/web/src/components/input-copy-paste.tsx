@@ -18,6 +18,7 @@ export const InputCopyPaste = ({
 	showCopy = true,
 	showPaste,
 	showClear,
+	readOnly,
 	onChange,
 	...props
 }: Props) => {
@@ -70,6 +71,7 @@ export const InputCopyPaste = ({
 						aria-label="Paste"
 						title="Paste"
 						size="icon-xs"
+						disabled={readOnly}
 						onClick={handlePaste}
 					>
 						<ClipboardIcon />
@@ -82,6 +84,7 @@ export const InputCopyPaste = ({
 						aria-label="Clear"
 						title="Clear"
 						size="icon-xs"
+						disabled={readOnly}
 						onClick={handleClear}
 					>
 						<XIcon />
