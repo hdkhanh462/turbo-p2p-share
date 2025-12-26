@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-
+import { useAppSettings } from "@/hooks/use-app-settings";
+import type { AppSettingsState } from "@/store/app-settings-slice";
 import { delay } from "@/utils/delay";
 import { randomText } from "@/utils/random-text";
 
@@ -20,7 +21,7 @@ export type UploadTask = {
 	file: File;
 	priority: number;
 	retries: number;
-	maxRetries: number;
+	maxRetries: AppSettingsState["maxRetries"];
 	controller: AbortController;
 
 	windowBytes: number;
@@ -35,30 +36,25 @@ export interface UploadTransport {
 	): Promise<void>;
 }
 
-export type UploadQueueOptions = {
-	concurrency?: number;
-	autoRetry?: boolean;
-};
-
-const DEFAULT_QUEUE_OPTIONS: Required<UploadQueueOptions> = {
-	concurrency: 3,
-	autoRetry: false,
-};
+export type UploadQueueOptions = Partial<
+	Pick<AppSettingsState, "maxConcurrency" | "autoRetry">
+>;
 
 export type UploadTaskOptions = Partial<
 	Pick<UploadTask, "priority" | "maxRetries">
 >;
 
-const DEFAULT_TASK_OPTIONS: Required<UploadTaskOptions> = {
-	priority: 0,
-	maxRetries: 3,
-};
-
 export function useUploadQueue(
 	transport: UploadTransport,
 	options?: UploadQueueOptions,
 ) {
-	const opts = { ...DEFAULT_QUEUE_OPTIONS, ...options };
+	const { appSettings } = useAppSettings();
+
+	const opts: Required<UploadQueueOptions> = {
+		maxConcurrency: appSettings.maxConcurrency,
+		autoRetry: appSettings.autoRetry,
+		...options,
+	};
 
 	const queueRef = useRef<UploadTask[]>([]);
 	const headRef = useRef(0);
@@ -72,7 +68,7 @@ export function useUploadQueue(
 		if (pausedRef.current) return;
 
 		while (
-			activeRef.current < opts.concurrency &&
+			activeRef.current < opts.maxConcurrency &&
 			headRef.current < queueRef.current.length
 		) {
 			const task = queueRef.current[headRef.current++];
@@ -178,7 +174,11 @@ export function useUploadQueue(
 
 	//#region PUBLIC API
 	const addFiles = (files: File[], options?: UploadTaskOptions) => {
-		const taskOptions = { ...DEFAULT_TASK_OPTIONS, ...options };
+		const opts: Required<UploadTaskOptions> = {
+			maxRetries: appSettings.maxRetries,
+			priority: 0,
+			...options,
+		};
 		files.forEach((file, index) => {
 			const id = randomText({ prefix: "upload_" });
 			const controller = new AbortController();
@@ -192,8 +192,8 @@ export function useUploadQueue(
 				windowBytes: 0,
 				startTime: now,
 				lastTick: now,
-				...taskOptions,
-				priority: taskOptions.priority ?? index,
+				...opts,
+				priority: opts.priority ?? index,
 			};
 
 			queueRef.current.push(task);

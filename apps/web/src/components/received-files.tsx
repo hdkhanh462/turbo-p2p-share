@@ -72,7 +72,7 @@ function ReceivedFilesEmpty() {
 		<Empty className="max-h-35.5 rounded-lg border-2 border-dashed p-8">
 			<EmptyHeader>
 				<EmptyMedia variant="icon" className="size-11.5 rounded-full border">
-					<InboxIcon className="size-6 text-muted-foreground" />
+					<InboxIcon className="size-6 text-primary" />
 				</EmptyMedia>
 
 				<EmptyTitle>No files received</EmptyTitle>

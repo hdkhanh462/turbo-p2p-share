@@ -1,14 +1,20 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowUpRightFromSquareIcon, PauseIcon } from "lucide-react";
+import {
+	ArrowUpRightFromSquareIcon,
+	PauseIcon,
+	SettingsIcon,
+} from "lucide-react";
 import { useEffect } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import z from "zod";
 import { InputCopyPaste } from "@/components/input-copy-paste";
 import Loader from "@/components/loader";
+import { ModeToggle } from "@/components/mode-toggle";
 import { ReceivedFiles } from "@/components/received-files";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
+	CardAction,
 	CardContent,
 	CardDescription,
 	CardHeader,
@@ -103,6 +109,13 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 				<CardDescription>
 					Connect to the same network to sharing files
 				</CardDescription>
+				<CardAction className="flex gap-2">
+					<ModeToggle />
+					<Button variant="outline">
+						<SettingsIcon />
+						Settings
+					</Button>
+				</CardAction>
 			</CardHeader>
 			<CardContent>
 				<form onSubmit={(e) => e.preventDefault()}>
