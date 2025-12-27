@@ -1,16 +1,14 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-	ArrowUpRightFromSquareIcon,
-	PauseIcon,
-	SettingsIcon,
-} from "lucide-react";
+import { PauseIcon, QrCodeIcon } from "lucide-react";
 import { useEffect } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import z from "zod";
+
 import { InputCopyPaste } from "@/components/input-copy-paste";
 import Loader from "@/components/loader";
 import { ModeToggle } from "@/components/mode-toggle";
 import { ReceivedFiles } from "@/components/received-files";
+import { SettingsDialog } from "@/components/settings-dialog";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -111,10 +109,7 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 				</CardDescription>
 				<CardAction className="flex gap-2">
 					<ModeToggle />
-					<Button variant="outline">
-						<SettingsIcon />
-						Settings
-					</Button>
+					<SettingsDialog />
 				</CardAction>
 			</CardHeader>
 			<CardContent>
@@ -126,9 +121,12 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 								control={form.control}
 								render={({ field, fieldState }) => (
 									<Field data-invalid={fieldState.invalid}>
-										<FieldLabel>My Room ID</FieldLabel>
+										<FieldLabel htmlFor={`share-form-${field.name}`}>
+											My Room ID
+										</FieldLabel>
 										<InputCopyPaste
 											{...field}
+											id={`share-form-${field.name}`}
 											aria-invalid={fieldState.invalid}
 											placeholder="Your Room ID"
 											readOnly
@@ -140,7 +138,7 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 								)}
 							/>
 							<Button type="button" size="icon">
-								<ArrowUpRightFromSquareIcon />
+								<QrCodeIcon />
 							</Button>
 						</div>
 						<div className="flex items-end gap-2">
@@ -149,9 +147,12 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 								control={form.control}
 								render={({ field, fieldState }) => (
 									<Field data-invalid={fieldState.invalid}>
-										<FieldLabel>Partner's Room ID</FieldLabel>
+										<FieldLabel htmlFor={`share-form-${field.name}`}>
+											Partner's Room ID
+										</FieldLabel>
 										<InputCopyPaste
 											{...field}
+											id={`share-form-${field.name}`}
 											aria-invalid={fieldState.invalid}
 											placeholder="Enter Partner Room ID"
 											autoComplete="off"
@@ -193,8 +194,12 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 								</div>
 							)}
 						</div>
-						<UploadFiles p2p={p2p} />
-						<ReceivedFiles p2p={p2p} />
+						{currentRoomId && (
+							<>
+								<UploadFiles p2p={p2p} />
+								<ReceivedFiles p2p={p2p} />
+							</>
+						)}
 					</FieldGroup>
 				</form>
 			</CardContent>

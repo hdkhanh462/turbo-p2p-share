@@ -1,4 +1,5 @@
 import { BanIcon, DownloadIcon, InboxIcon, XIcon } from "lucide-react";
+
 import { FileList } from "@/components/file-list";
 import { TransferFileItem } from "@/components/transfer-file-item";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field } from "@/components/ui/field";
 import type { useP2PSharing } from "@/hooks/use-p2p-sharing";
 import { downloadFile } from "@/utils/download";
 
@@ -19,8 +20,7 @@ type Props = {
 export const ReceivedFiles = ({ p2p: { receiverItems } }: Props) => {
 	return (
 		<Field>
-			<FieldLabel>Received Files</FieldLabel>
-
+			<div className="font-medium text-sm leading-snug">Received Files</div>
 			<FileList empty={<ReceivedFilesEmpty />}>
 				{receiverItems.map((item) => (
 					<TransferFileItem

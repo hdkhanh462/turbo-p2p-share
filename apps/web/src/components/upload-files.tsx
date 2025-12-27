@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { FileList } from "@/components/file-list";
 import { TransferFileItem } from "@/components/transfer-file-item";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field } from "@/components/ui/field";
 import {
 	FileUpload,
 	FileUploadDropzone,
@@ -65,7 +65,7 @@ export function UploadFiles({ p2p: { senderItems, addFiles } }: Props) {
 
 	return (
 		<Field>
-			<FieldLabel>Upload Files</FieldLabel>
+			<div className="font-medium text-sm leading-snug">Upload Files</div>
 			<FileUpload
 				value={files}
 				onValueChange={setFiles}

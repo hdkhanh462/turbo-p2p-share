@@ -57,14 +57,11 @@ function RootComponent() {
 				disableTransitionOnChange
 				storageKey="vite-ui-theme"
 			>
-				<div className="grid h-svh grid-rows-[auto_1fr]">
-					{/* <Header /> */}
-					<SocketProvider>
-						<AlertDialogProvider>
-							<Outlet />
-						</AlertDialogProvider>
-					</SocketProvider>
-				</div>
+				<SocketProvider>
+					<AlertDialogProvider>
+						<Outlet />
+					</AlertDialogProvider>
+				</SocketProvider>
 				<Toaster richColors />
 			</ThemeProvider>
 			<TanStackRouterDevtools position="bottom-left" />
