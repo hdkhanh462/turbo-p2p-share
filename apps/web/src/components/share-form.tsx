@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PauseIcon, QrCodeIcon } from "lucide-react";
+import { PauseIcon } from "lucide-react";
 import { useEffect } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import z from "zod";
@@ -7,6 +7,7 @@ import z from "zod";
 import { InputCopyPaste } from "@/components/input-copy-paste";
 import Loader from "@/components/loader";
 import { ModeToggle } from "@/components/mode-toggle";
+import { QRDialog } from "@/components/qr-dialog";
 import { ReceivedFiles } from "@/components/received-files";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { Button } from "@/components/ui/button";
@@ -137,9 +138,9 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 									</Field>
 								)}
 							/>
-							<Button type="button" size="icon">
-								<QrCodeIcon />
-							</Button>
+							<QRDialog
+								value={`${import.meta.env.VITE_APP_URL}?roomId=${myRoomId}`}
+							/>
 						</div>
 						<div className="flex items-end gap-2">
 							<Controller

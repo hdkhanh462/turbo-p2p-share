@@ -172,15 +172,16 @@ export const SettingsDialog = () => {
 					<Button
 						type="button"
 						variant="outline"
-						onClick={() =>
+						onClick={() => {
 							form.reset({
 								...DEFAULT_APP_SETTINGS,
 								chunkSize: [DEFAULT_APP_SETTINGS.chunkSize / 1024],
 								maxBufferedAmount: [
 									DEFAULT_APP_SETTINGS.maxBufferedAmount / 1024,
 								],
-							})
-						}
+							});
+							setAppSettings(DEFAULT_APP_SETTINGS);
+						}}
 					>
 						Reset Defaults
 					</Button>

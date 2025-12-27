@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
-import { useAppSettings } from "@/hooks/use-app-settings";
-import type { AppSettingsState } from "@/store/app-settings-slice";
+import {
+	type AppSettingsState,
+	useAppSettings,
+} from "@/hooks/use-app-settings";
 import { delay } from "@/utils/delay";
 import { randomText } from "@/utils/random-text";
 

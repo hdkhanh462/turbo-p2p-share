@@ -37,6 +37,7 @@
 		"react": "19.2.3",
 		"react-dom": "19.2.3",
 		"react-hook-form": "^7.69.0",
+		"react-qr-code": "^2.0.18",
 		"shadcn": "^3.6.2",
 		"socket.io-client": "^4.8.1",
 		"sonner": "^2.0.7",

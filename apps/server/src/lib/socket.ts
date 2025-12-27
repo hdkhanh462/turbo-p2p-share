@@ -84,6 +84,18 @@ export function setupSocket(server: HttpServer) {
 
 			io.to(roomId).emit("room:terminate");
 			if (roomId !== socket.data.roomId) socket.leave(roomId);
+			else {
+				const room = io.sockets.adapter.rooms.get(roomId);
+				if (room) {
+					for (const memberId of room) {
+						const memberSocket = io.sockets.sockets.get(memberId);
+						if (memberSocket && memberId !== socket.id) {
+							console.log("[Room] Removing member:", memberId);
+							memberSocket.leave(roomId);
+						}
+					}
+				}
+			}
 		});
 
 		socket.on("file:offer", (payload) => {

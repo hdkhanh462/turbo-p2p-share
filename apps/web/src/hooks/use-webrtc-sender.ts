@@ -1,8 +1,10 @@
 import { useRef } from "react";
 
-import { useAppSettings } from "@/hooks/use-app-settings";
+import {
+	type AppSettingsState,
+	useAppSettings,
+} from "@/hooks/use-app-settings";
 import type { UploadTransport } from "@/hooks/use-upload-queue";
-import type { AppSettingsState } from "@/store/app-settings-slice";
 import type { ChannelMessage } from "@/types/webrtc";
 import { sendMessage } from "@/utils/webrtc";
 
@@ -44,7 +46,9 @@ export function useWebRtcSender(
 		let offset = 0;
 
 		return new Promise<void>((resolve, reject) => {
+			console.log("[Sender] Data channel created:", channel.label);
 			channel.onopen = async () => {
+				console.log("[Sender] Channel opened:", channel.label);
 				sendMessage(channel, {
 					type: "META",
 					id: task.id,
