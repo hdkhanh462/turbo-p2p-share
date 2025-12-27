@@ -1,24 +1,26 @@
 import { useRef } from "react";
 
+import { useAppSettings } from "@/hooks/use-app-settings";
 import type { UploadTransport } from "@/hooks/use-upload-queue";
+import type { AppSettingsState } from "@/store/app-settings-slice";
 import type { ChannelMessage } from "@/types/webrtc";
 import { sendMessage } from "@/utils/webrtc";
 
-type SenderOptions = {
-	chunkSize?: number;
-	maxBufferedAmount?: number;
-};
-
-const DEFAULT_SENDER_OPTIONS: Required<SenderOptions> = {
-	chunkSize: 256 * 1024,
-	maxBufferedAmount: 512 * 1024,
-};
+type SenderOptions = Partial<
+	Pick<AppSettingsState, "chunkSize" | "maxBufferedAmount">
+>;
 
 export function useWebRtcSender(
 	peer: RTCPeerConnection | null,
 	options?: SenderOptions,
 ) {
-	const opts = { ...DEFAULT_SENDER_OPTIONS, ...options };
+	const { appSettings } = useAppSettings();
+
+	const opts: Required<SenderOptions> = {
+		chunkSize: appSettings.chunkSize,
+		maxBufferedAmount: appSettings.maxBufferedAmount,
+		...options,
+	};
 	const channelsRef = useRef<Map<string, RTCDataChannel>>(new Map());
 
 	//#region HELPERS

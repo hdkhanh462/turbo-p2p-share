@@ -1,10 +1,11 @@
 import { BanIcon, RefreshCcwIcon, UploadIcon, XIcon } from "lucide-react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
+
 import { FileList } from "@/components/file-list";
 import { TransferFileItem } from "@/components/transfer-file-item";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field } from "@/components/ui/field";
 import {
 	FileUpload,
 	FileUploadDropzone,
@@ -14,16 +15,17 @@ import {
 	FileUploadItemPreview,
 	type FileUploadProps,
 } from "@/components/ui/file-upload";
+import { useAppSettings } from "@/hooks/use-app-settings";
 import type { useP2PSharing } from "@/hooks/use-p2p-sharing";
 import type { UploadItem } from "@/hooks/use-upload-queue";
-
-const MAX_FILES = 5;
 
 type Props = {
 	p2p: ReturnType<typeof useP2PSharing>;
 };
 
 export function UploadFiles({ p2p: { senderItems, addFiles } }: Props) {
+	const { appSettings } = useAppSettings();
+
 	const [files, setFiles] = useState<File[]>([]);
 	const uploadingItems = senderItems.filter(
 		(item) => item.status === "uploading",
@@ -47,10 +49,12 @@ export function UploadFiles({ p2p: { senderItems, addFiles } }: Props) {
 	const onMultipleUpload: NonNullable<FileUploadProps["onUpload"]> =
 		useCallback(
 			async (files) => {
+				if (!appSettings.autoUpload) return;
+
 				addFiles(files);
 				setFiles([]);
 			},
-			[addFiles],
+			[addFiles, appSettings.autoUpload],
 		);
 
 	const onFileReject = useCallback((file: File, message: string) => {
@@ -61,29 +65,29 @@ export function UploadFiles({ p2p: { senderItems, addFiles } }: Props) {
 
 	return (
 		<Field>
-			<FieldLabel>Upload Files</FieldLabel>
+			<div className="font-medium text-sm leading-snug">Upload Files</div>
 			<FileUpload
 				value={files}
 				onValueChange={setFiles}
 				onFileReject={onFileReject}
 				onUpload={onMultipleUpload}
-				maxFiles={MAX_FILES}
+				maxFiles={appSettings.maxFilesSelect}
 				className="w-full"
 				multiple
 			>
 				<FileUploadDropzone>
 					<div className="flex flex-col items-center gap-1 text-center">
 						<div className="flex items-center justify-center rounded-full border bg-muted p-2.5">
-							<UploadIcon className="size-6 text-muted-foreground" />
+							<UploadIcon className="size-6 text-primary" />
 						</div>
 						<p className="font-medium text-sm">Drag & drop files here</p>
 						<p className="text-muted-foreground text-xs">
-							Or click to browse (max {MAX_FILES} files)
+							Or click to browse (max {appSettings.maxFilesSelect} files)
 						</p>
 					</div>
 				</FileUploadDropzone>
 				<FileList>
-					{files.length > 0 && (
+					{!appSettings.autoUpload && files.length > 0 && (
 						<>
 							<div className="font-medium text-sm leading-snug">
 								Selected files

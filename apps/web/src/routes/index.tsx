@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import z from "zod";
+
 import { ShareForm } from "@/components/share-form";
 
 const roomSchema = z.object({
@@ -15,7 +16,7 @@ function HomeComponent() {
 	const { roomId } = Route.useSearch();
 
 	return (
-		<div className="flex items-center justify-center p-4 py-8">
+		<div className="flex min-h-screen items-center justify-center p-4 py-8">
 			<div className="w-full max-w-lg">
 				<ShareForm roomIdParam={roomId} />
 			</div>
