@@ -7,7 +7,7 @@
 		"check-types": "tsc -b",
 		"compile": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile server",
 		"dev": "tsx watch src/index.ts",
-		"start": "node dist/index.js"
+		"start": "node dist/index.mjs"
 	},
 	"dependencies": {
 		"@orpc/openapi": "^1.12.2",
