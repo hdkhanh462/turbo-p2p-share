@@ -57,7 +57,7 @@ app.use(async (req, res, next) => {
 
 app.use(express.json());
 
-app.get("/", (_req, res) => {
+app.get("/health", (_req, res) => {
 	res.status(200).send("OK");
 });
 
