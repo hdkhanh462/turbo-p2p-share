@@ -2,8 +2,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { PauseIcon } from "lucide-react";
 import { useEffect } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
+import { toast } from "sonner";
 import z from "zod";
-
 import { InputCopyPaste } from "@/components/input-copy-paste";
 import Loader from "@/components/loader";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -78,6 +78,9 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 			},
 			onRoomTerminated: () => {
 				console.log("[Room] Terminated");
+				toast.info("Connection terminated", {
+					description: "The P2P connection has been terminated.",
+				});
 
 				p2p.cleanup();
 			},

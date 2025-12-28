@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-
 import type { SocketTyped } from "@/hooks/use-socket";
 import { useUploadQueue } from "@/hooks/use-upload-queue";
 import { useWebRtcReceiver } from "@/hooks/use-webrtc-receiver";
@@ -18,7 +17,9 @@ export const useP2PSharing = (socket: SocketTyped | null) => {
 	//#region HELPERS
 	const createPeerConnection = useCallback(
 		(roomId: string) => {
-			const pc = new RTCPeerConnection({ iceServers: [] });
+			const pc = new RTCPeerConnection({
+				iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+			});
 
 			pc.onicecandidate = (e) => {
 				if (e.candidate) {
@@ -29,7 +30,19 @@ export const useP2PSharing = (socket: SocketTyped | null) => {
 				}
 			};
 
-			pc.onconnectionstatechange = () => setConnectionState(pc.connectionState);
+			pc.onconnectionstatechange = () => {
+				console.log("[P2P] Connection state changed:", pc.connectionState);
+				setConnectionState(pc.connectionState);
+			};
+
+			pc.oniceconnectionstatechange = () =>
+				console.log(
+					"[P2P] ICE connection state changed:",
+					pc.iceConnectionState,
+				);
+
+			pc.onicegatheringstatechange = () =>
+				console.log("[P2P] ICE gathering state changed:", pc.iceGatheringState);
 
 			setPeer(pc);
 			return pc;
@@ -57,7 +70,7 @@ export const useP2PSharing = (socket: SocketTyped | null) => {
 		});
 
 		socket?.on("file:answer", async ({ sdp }) => {
-			console.log("[P2P] Answer received:", sdp);
+			console.log("[P2P] Answer received:", { peer, sdp });
 
 			await peer?.setRemoteDescription(sdp);
 		});

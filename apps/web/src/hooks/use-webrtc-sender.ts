@@ -1,5 +1,5 @@
 import { useRef } from "react";
-
+import { toast } from "sonner";
 import {
 	type AppSettingsState,
 	useAppSettings,
@@ -103,6 +103,12 @@ export function useWebRtcSender(
 						return;
 					}
 
+					toast.error("Upload error", {
+						description: `Failed to upload ${task.file.name}: ${
+							(error as Error).message
+						}`,
+					});
+
 					reject(error);
 				}
 			};
@@ -116,6 +122,9 @@ export function useWebRtcSender(
 
 					if (msg.type === "CANCEL") {
 						task.controller.abort();
+						toast.info("Upload cancelled", {
+							description: "File transfer was cancelled by the receiver.",
+						});
 						reject("Cancelled by receiver");
 					}
 

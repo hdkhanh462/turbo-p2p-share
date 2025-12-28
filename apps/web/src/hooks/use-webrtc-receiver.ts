@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-
+import { toast } from "sonner";
 import type { ChannelMessage, FileMeta } from "@/types/webrtc";
 import { sendMessage } from "@/utils/webrtc";
 
@@ -81,6 +81,9 @@ export function useWebRtcReceiver(peer: RTCPeerConnection | null) {
 			}
 
 			if (msg.type === "CANCEL") {
+				toast.info("Download cancelled", {
+					description: "File transfer was cancelled by the sender.",
+				});
 				setItems((prev) => prev.filter((i) => i.id !== msg.id));
 				channel.close();
 				tasksRef.current.delete(msg.id);
