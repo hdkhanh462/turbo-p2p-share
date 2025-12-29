@@ -51,7 +51,12 @@ export const InputCopyPaste = ({
 
 	return (
 		<InputGroup>
-			<InputGroupInput value={value} onChange={onChange} {...props} />
+			<InputGroupInput
+				value={value}
+				readOnly={readOnly}
+				onChange={onChange}
+				{...props}
+			/>
 			{showCopy && (
 				<InputGroupAddon align="inline-end">
 					<InputGroupButton
@@ -81,6 +86,7 @@ export const InputCopyPaste = ({
 			{showClear && value && (
 				<InputGroupAddon align="inline-end">
 					<InputGroupButton
+						className="text-destructive hover:text-destructive"
 						aria-label="Clear"
 						title="Clear"
 						size="icon-xs"

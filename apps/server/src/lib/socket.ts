@@ -107,6 +107,15 @@ export function setupSocket(server: HttpServer) {
 			}
 		});
 
+		socket.on("room:message", ({ roomId, text }) => {
+			console.log("[Room] Messaging:", roomId);
+			io.to(roomId).emit("room:message", {
+				id: crypto.randomUUID(),
+				senderId: socket.id,
+				text,
+			});
+		});
+
 		socket.on("file:offer", (payload) => {
 			console.log("[File] Offering:", payload.roomId);
 

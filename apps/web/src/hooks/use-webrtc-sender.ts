@@ -153,7 +153,16 @@ export function useWebRtcSender(
 			channel.onclose = () => console.log("[Sender] Closed:", channel.label);
 		});
 	};
+
+	const cleanup = () => {
+		channelsRef.current.forEach((channel) => {
+			if (channel.readyState !== "closed") {
+				channel.close();
+			}
+		});
+		channelsRef.current.clear();
+	};
 	//#endregion
 
-	return { upload };
+	return { upload, cleanup };
 }
