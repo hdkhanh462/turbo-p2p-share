@@ -28,8 +28,13 @@ export function useWebRtcSender(
 	//#region HELPERS
 	const waitBufferedLow = (channel: RTCDataChannel) =>
 		new Promise<void>((resolve) => {
-			channel.onbufferedamountlow = () => resolve();
+			const onLow = () => {
+				channel.removeEventListener("bufferedamountlow", onLow);
+				resolve();
+			};
+			channel.addEventListener("bufferedamountlow", onLow);
 		});
+
 	//#endregion
 
 	//#region PUBLIC API
@@ -38,7 +43,7 @@ export function useWebRtcSender(
 
 		const channel = peer.createDataChannel(task.id);
 		channel.binaryType = "arraybuffer";
-		channel.bufferedAmountLowThreshold = opts.maxBufferedAmount;
+		channel.bufferedAmountLowThreshold = opts.maxBufferedAmount / 2;
 
 		channelsRef.current.set(task.id, channel);
 
@@ -49,6 +54,11 @@ export function useWebRtcSender(
 			console.log("[Sender] Data channel created:", channel.label);
 			channel.onopen = async () => {
 				console.log("[Sender] Channel opened:", channel.label);
+
+				if (channel.bufferedAmount > opts.maxBufferedAmount) {
+					await waitBufferedLow(channel);
+				}
+
 				sendMessage(channel, {
 					type: "META",
 					id: task.id,
@@ -67,11 +77,20 @@ export function useWebRtcSender(
 							throw new DOMException("Canceled", "AbortError");
 						}
 
+						// backpressure
+						if (channel.bufferedAmount > opts.maxBufferedAmount) {
+							await waitBufferedLow(channel);
+						}
+
 						const chunk = task.file.slice(offset, offset + opts.chunkSize);
 						const buffer = await chunk.arrayBuffer();
 
 						channel.send(buffer);
-						offset += opts.chunkSize;
+						offset += buffer.byteLength;
+
+						if (offset % (512 * 1024) === 0) {
+							await new Promise((r) => setTimeout(r, 0));
+						}
 
 						task.windowBytes += buffer.byteLength;
 						const now = performance.now();
@@ -87,11 +106,6 @@ export function useWebRtcSender(
 						}
 
 						onProgress(Math.round((offset / total) * 100), speedMbps);
-
-						// backpressure
-						if (channel.bufferedAmount > opts.maxBufferedAmount) {
-							await waitBufferedLow(channel);
-						}
 					}
 
 					sendMessage(channel, { type: "EOF", id: task.id });

@@ -27,6 +27,15 @@ export function setupSocket(server: HttpServer) {
 		console.log("[Socket] Connected:", socket.id);
 
 		socket.on("room:create", ({ roomId }) => {
+			const room = io.sockets.adapter.rooms.get(roomId);
+			if (room) {
+				console.log("[Room] Already exists:", roomId);
+				io.to(socket.id).emit("error", {
+					messages: [`Room with ID "${roomId}" already exists.`],
+				});
+				return;
+			}
+
 			console.log("[Room] Creating:", roomId);
 
 			socket.data.roomId = roomId;

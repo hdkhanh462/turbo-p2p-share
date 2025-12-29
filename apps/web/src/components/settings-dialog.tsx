@@ -45,7 +45,7 @@ export const SettingsDialog = () => {
 		defaultValues: {
 			...appSettings,
 			chunkSize: [appSettings.chunkSize / 1024],
-			maxBufferedAmount: [appSettings.maxBufferedAmount / 1024],
+			maxBufferedAmount: [appSettings.maxBufferedAmount / 1024 / 1024],
 		},
 	});
 
@@ -53,7 +53,7 @@ export const SettingsDialog = () => {
 		setAppSettings({
 			...input,
 			chunkSize: input.chunkSize[0] * 1024,
-			maxBufferedAmount: input.maxBufferedAmount[0] * 1024,
+			maxBufferedAmount: input.maxBufferedAmount[0] * 1024 * 1024,
 		});
 		form.reset(input);
 	};
@@ -160,10 +160,10 @@ export const SettingsDialog = () => {
 						<FormSlider
 							control={form.control}
 							name="maxBufferedAmount"
-							label={(value) => `Max Buffered Amount (${value[0]} KB)`}
+							label={(value) => `Max Buffered Amount (${value[0]} MB)`}
 							inputProps={{
-								max: 512,
-								step: 16,
+								max: 5,
+								step: 1,
 							}}
 						/>
 					</FieldGroup>
@@ -177,7 +177,7 @@ export const SettingsDialog = () => {
 								...DEFAULT_APP_SETTINGS,
 								chunkSize: [DEFAULT_APP_SETTINGS.chunkSize / 1024],
 								maxBufferedAmount: [
-									DEFAULT_APP_SETTINGS.maxBufferedAmount / 1024,
+									DEFAULT_APP_SETTINGS.maxBufferedAmount / 1024 / 1024,
 								],
 							});
 							setAppSettings(DEFAULT_APP_SETTINGS);

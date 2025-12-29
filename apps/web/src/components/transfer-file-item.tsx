@@ -60,13 +60,13 @@ export function TransferFileItem({ data, action }: Props) {
 						{data.item.status === "uploading" && (
 							<>
 								<ArrowUpIcon className="size-3.5" />
-								<div>{`${data.item.speedMbps}Mbps`}</div>
+								<div>{`${data.item.speedMbps} Mbps`}</div>
 							</>
 						)}
 						{data.item.status === "receiving" && (
 							<>
 								<ArrowDownIcon className="size-3.5" />
-								<div>{`${data.item.speedMbps}Mbps`}</div>
+								<div>{`${data.item.speedMbps} Mbps`}</div>
 							</>
 						)}
 					</div>

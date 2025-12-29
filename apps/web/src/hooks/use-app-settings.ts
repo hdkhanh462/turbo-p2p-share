@@ -12,11 +12,11 @@ export type AppSettingsState = {
 };
 
 export const DEFAULT_APP_SETTINGS: AppSettingsState = {
-	chunkSize: 128 * 1024,
+	chunkSize: 32 * 1024,
 	maxRetries: 3,
-	maxConcurrency: 3,
+	maxConcurrency: 2,
 	maxFilesSelect: 5,
-	maxBufferedAmount: 384 * 1024,
+	maxBufferedAmount: 2 * 1024 * 1024,
 	showSpeed: true,
 	autoRetry: false,
 	autoUpload: false,

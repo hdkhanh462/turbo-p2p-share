@@ -8,12 +8,12 @@ import {
 	useCallback,
 	useContext,
 	useEffect,
-	useMemo,
 	useRef,
 	useState,
 } from "react";
 import { io, type Socket } from "socket.io-client";
 import { toast } from "sonner";
+import { useLocalStorage } from "@/hooks/use-local-storage";
 import { randomText } from "@/utils/random-text";
 
 export type SocketTyped = Socket<
@@ -42,10 +42,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
 
 	const [connected, setConnected] = useState(false);
 
-	const myRoomId = useMemo(() => randomText({ prefix: "room_" }), []);
-	// const [myRoomId] = useLocalStorage("my-room-id", () =>
-	// 	randomText({ prefix: "room_" }),
-	// );
+	const [myRoomId] = useLocalStorage("my-room-id", () =>
+		randomText({ prefix: "room_" }),
+	);
 
 	const onError = useCallback<ServerToClientHandlers["error"]>(
 		({ messages }) => {

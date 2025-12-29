@@ -75,6 +75,9 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 			},
 			onRoomRequestCancelled: (payload) => {
 				console.log("[Room] Request cancelled:", payload);
+				toast.info("Connection request cancelled", {
+					description: "The connection request has been cancelled.",
+				});
 			},
 			onRoomTerminated: () => {
 				console.log("[Room] Terminated");
@@ -89,6 +92,24 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 			},
 			onRoomRejected: (payload) => {
 				console.log("[Room] Rejected: ", payload);
+
+				if (payload.reason === "ROOM_FULL") {
+					toast.error("Room is full", {
+						description:
+							"The room you are trying to join is full. Please try another room.",
+					});
+					return;
+				}
+				if (payload.reason === "HOST_REJECTED") {
+					toast.error("Connection rejected", {
+						description: "The host has rejected your connection request.",
+					});
+					return;
+				}
+				toast.error("Host is busy", {
+					description:
+						"The host is currently busy and cannot accept new connections.",
+				});
 			},
 		});
 
@@ -159,7 +180,6 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 											id={`share-form-${field.name}`}
 											aria-invalid={fieldState.invalid}
 											placeholder="Enter Partner Room ID"
-											autoComplete="off"
 											showCopy={false}
 											readOnly={connecting || !!currentRoomId}
 											showPaste
@@ -189,7 +209,7 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 									)}
 									<Button
 										type="button"
-										disabled={connecting}
+										disabled={connecting || !partnerRoomId}
 										onClick={handleRoomRequest}
 									>
 										<Loader isLoading={connecting} />
