@@ -107,13 +107,18 @@ export function setupSocket(server: HttpServer) {
 			}
 		});
 
-		socket.on("room:message", ({ roomId, text }) => {
+		socket.on("room:message", ({ roomId, encryptedMessage }) => {
 			console.log("[Room] Messaging:", roomId);
-			io.to(roomId).emit("room:message", {
+			socket.to(roomId).emit("room:message", {
 				id: crypto.randomUUID(),
 				senderId: socket.id,
-				text,
+				encryptedMessage,
 			});
+		});
+
+		socket.on("room:public-key", ({ roomId, publicKey }) => {
+			console.log("[Room] Public key:", roomId);
+			socket.to(roomId).emit("room:public-key", { roomId, publicKey });
 		});
 
 		socket.on("file:offer", (payload) => {

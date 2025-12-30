@@ -4,6 +4,7 @@ import {
 	type AppSettingsState,
 	useAppSettings,
 } from "@/hooks/use-app-settings";
+import { useE2EEncryption } from "@/hooks/use-e2e-encryption";
 import type { UploadTransport } from "@/hooks/use-upload-queue";
 import type { ChannelMessage } from "@/types/webrtc";
 import { sendMessage } from "@/utils/webrtc";
@@ -17,6 +18,7 @@ export function useWebRtcSender(
 	options?: SenderOptions,
 ) {
 	const { appSettings } = useAppSettings();
+	const { encryptText } = useE2EEncryption();
 
 	const opts: Required<SenderOptions> = {
 		chunkSize: appSettings.chunkSize,
@@ -59,14 +61,23 @@ export function useWebRtcSender(
 					await waitBufferedLow(channel);
 				}
 
-				sendMessage(channel, {
-					type: "META",
-					id: task.id,
-					meta: {
+				const encryptedMeta = await encryptText(
+					JSON.stringify({
 						name: task.file.name,
 						size: task.file.size,
 						mime: task.file.type,
-					},
+					}),
+				);
+
+				sendMessage(channel, {
+					type: "META",
+					id: task.id,
+					encryptedMeta,
+					// meta: {
+					// 	name: task.file.name,
+					// 	size: task.file.size,
+					// 	mime: task.file.type,
+					// },
 				});
 
 				console.log("[Sender] Sending file:", task.file);

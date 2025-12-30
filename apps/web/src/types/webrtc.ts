@@ -1,3 +1,5 @@
+import type { EncryptedPayload } from "@/types/e2e-encryption";
+
 export type SignalPayload =
 	| {
 			type: "meta";
@@ -17,7 +19,8 @@ export type ChannelMessage =
 	| {
 			type: "META";
 			id: string;
-			meta: FileMeta;
+			// meta: FileMeta;
+			encryptedMeta: EncryptedPayload;
 	  }
 	| {
 			type: "CANCEL";

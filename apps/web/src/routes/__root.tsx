@@ -17,6 +17,7 @@ import { AlertDialogProvider } from "@/hooks/use-alert-dialog";
 import { SocketProvider } from "@/hooks/use-socket";
 import { link, type orpc } from "@/utils/orpc";
 import "../index.css";
+import { E2EEncryptionProvider } from "@/hooks/use-e2e-encryption";
 
 export interface RouterAppContext {
 	orpc: typeof orpc;
@@ -58,9 +59,11 @@ function RootComponent() {
 				storageKey="vite-ui-theme"
 			>
 				<SocketProvider>
-					<AlertDialogProvider>
-						<Outlet />
-					</AlertDialogProvider>
+					<E2EEncryptionProvider>
+						<AlertDialogProvider>
+							<Outlet />
+						</AlertDialogProvider>
+					</E2EEncryptionProvider>
 				</SocketProvider>
 				<Toaster richColors />
 			</ThemeProvider>

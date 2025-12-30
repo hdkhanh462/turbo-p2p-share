@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useE2EEncryption } from "@/hooks/use-e2e-encryption";
 import type { ChannelMessage, FileMeta } from "@/types/webrtc";
 import { sendMessage } from "@/utils/webrtc";
 
@@ -31,6 +32,8 @@ export function useWebRtcReceiver(peer: RTCPeerConnection | null) {
 
 	const [items, setItems] = useState<ReceiveItem[]>([]);
 
+	const { decryptText } = useE2EEncryption();
+
 	//#region HELPERS
 	const updateItem = useCallback((id: string, update: Partial<ReceiveItem>) => {
 		setItems((prev) =>
@@ -39,7 +42,7 @@ export function useWebRtcReceiver(peer: RTCPeerConnection | null) {
 	}, []);
 
 	const handleControl = useCallback(
-		(channel: RTCDataChannel, data: string) => {
+		async (channel: RTCDataChannel, data: string) => {
 			const msg: ChannelMessage = JSON.parse(data);
 			console.log("[Receiver] Message received:", msg);
 
@@ -47,9 +50,14 @@ export function useWebRtcReceiver(peer: RTCPeerConnection | null) {
 
 			if (msg.type === "META") {
 				const now = performance.now();
+
+				const meta = await decryptText(msg.encryptedMeta);
+				const parsedMeta: FileMeta = JSON.parse(meta);
+				console.log("[DEBUG] Parsed meta:", parsedMeta);
+
 				tasksRef.current.set(msg.id, {
 					id: msg.id,
-					meta: msg.meta,
+					meta: parsedMeta,
 					received: 0,
 					chunks: [],
 
@@ -60,7 +68,7 @@ export function useWebRtcReceiver(peer: RTCPeerConnection | null) {
 
 				const item: ReceiveItem = {
 					id: msg.id,
-					meta: msg.meta,
+					meta: parsedMeta,
 					progress: 0,
 					speedMbps: 0,
 					status: "receiving",
@@ -102,7 +110,7 @@ export function useWebRtcReceiver(peer: RTCPeerConnection | null) {
 				updateItem(msg.id, { file, status: "done", progress: 100 });
 			}
 		},
-		[updateItem],
+		[updateItem, decryptText],
 	);
 
 	const handleBinary = useCallback(

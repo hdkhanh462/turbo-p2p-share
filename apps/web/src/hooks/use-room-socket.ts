@@ -2,7 +2,9 @@ import type { ServerToClientHandlers } from "@turbo-p2p-share/shared/types/socke
 import { useCallback, useEffect, useState } from "react";
 import type { ChatMessage } from "@/components/room-messages";
 import { useAlertDialog } from "@/hooks/use-alert-dialog";
+import { useE2EEncryption } from "@/hooks/use-e2e-encryption";
 import type { SocketTyped } from "@/hooks/use-socket";
+import { randomText } from "@/utils/random-text";
 
 type RoomOptions = {
 	onRoomCreated?: ServerToClientHandlers["room:create"];
@@ -17,6 +19,7 @@ type RoomOptions = {
 	onRoomRejected?: ServerToClientHandlers["room:reject"];
 	onRoomTerminated?: ServerToClientHandlers["room:terminate"];
 	onRoomMessage?: ServerToClientHandlers["room:message"];
+	onRoomPublicKey?: ServerToClientHandlers["room:public-key"];
 };
 
 export const useRoomSocket = (
@@ -28,6 +31,7 @@ export const useRoomSocket = (
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 
 	const { alert, close } = useAlertDialog();
+	const { encryptText, decryptText } = useE2EEncryption();
 
 	//#region HANDLERS
 	const cleanup = useCallback(() => {
@@ -111,12 +115,29 @@ export const useRoomSocket = (
 		}, [options, cleanup]);
 
 	const handleMessage: ServerToClientHandlers["room:message"] = useCallback(
-		(payload) => {
-			setMessages((prev) => [payload, ...prev]);
+		async (payload) => {
+			const plainText = await decryptText(payload.encryptedMessage);
+
+			setMessages((prev) => [
+				{
+					id: payload.id,
+					senderId: payload.senderId,
+					text: plainText,
+				},
+				...prev,
+			]);
 			options?.onRoomMessage?.(payload);
 		},
-		[options],
+		[options, decryptText],
 	);
+
+	const handleRoomPublicKey: ServerToClientHandlers["room:public-key"] =
+		useCallback(
+			(payload) => {
+				options?.onRoomPublicKey?.(payload);
+			},
+			[options?.onRoomPublicKey],
+		);
 
 	//#endregion
 
@@ -128,6 +149,7 @@ export const useRoomSocket = (
 		socket?.on("room:reject", handleRejected);
 		socket?.on("room:terminate", handleTerminated);
 		socket?.on("room:message", handleMessage);
+		socket?.on("room:public-key", handleRoomPublicKey);
 
 		return () => {
 			socket?.off("room:create", handleRoomCreated);
@@ -137,6 +159,7 @@ export const useRoomSocket = (
 			socket?.off("room:reject", handleRejected);
 			socket?.off("room:terminate", handleTerminated);
 			socket?.off("room:message", handleMessage);
+			socket?.off("room:public-key", handleRoomPublicKey);
 		};
 	}, [
 		socket,
@@ -147,6 +170,7 @@ export const useRoomSocket = (
 		handleRejected,
 		handleTerminated,
 		handleMessage,
+		handleRoomPublicKey,
 	]);
 
 	//#region PUBLIC API
@@ -168,9 +192,17 @@ export const useRoomSocket = (
 		}
 	};
 
-	const sendMessage = (text: string) => {
-		if (currentRoomId) {
-			socket?.emit("room:message", { roomId: currentRoomId, text });
+	const sendMessage = async (message: string) => {
+		if (currentRoomId && socket?.id) {
+			const newMessage: ChatMessage = {
+				id: randomText({ prefix: "msg_", length: 12 }),
+				senderId: socket.id,
+				text: message,
+			};
+			console.log("[DEBUG] Sending message:", newMessage);
+			setMessages((prev) => [newMessage, ...prev]);
+			const encryptedMessage = await encryptText(message);
+			socket?.emit("room:message", { roomId: currentRoomId, encryptedMessage });
 		}
 	};
 
