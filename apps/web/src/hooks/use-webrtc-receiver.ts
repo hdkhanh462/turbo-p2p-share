@@ -53,7 +53,6 @@ export function useWebRtcReceiver(peer: RTCPeerConnection | null) {
 
 				const meta = await decryptText(msg.encryptedMeta);
 				const parsedMeta: FileMeta = JSON.parse(meta);
-				console.log("[DEBUG] Parsed meta:", parsedMeta);
 
 				tasksRef.current.set(msg.id, {
 					id: msg.id,

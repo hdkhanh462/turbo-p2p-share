@@ -199,7 +199,6 @@ export const useRoomSocket = (
 				senderId: socket.id,
 				text: message,
 			};
-			console.log("[DEBUG] Sending message:", newMessage);
 			setMessages((prev) => [newMessage, ...prev]);
 			const encryptedMessage = await encryptText(message);
 			socket?.emit("room:message", { roomId: currentRoomId, encryptedMessage });

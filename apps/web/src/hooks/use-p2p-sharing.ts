@@ -93,7 +93,7 @@ export const useP2PSharing = (socket: SocketTyped | null) => {
 
 		const channel = pc.createDataChannel(roomId);
 		channel.onopen = () => {
-			console.info("[P2P] DataChannel open:", channel);
+			console.log("[P2P] DataChannel open:", channel);
 		};
 
 		const offer = await pc.createOffer();
