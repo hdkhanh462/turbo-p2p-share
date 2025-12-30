@@ -1,30 +1,19 @@
-import { createORPCClient } from "@orpc/client";
-import { createTanstackQueryUtils } from "@orpc/tanstack-query";
-import type { QueryClient } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import {
 	createRootRouteWithContext,
 	HeadContent,
 	Outlet,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-import type { AppRouterClient } from "@turbo-p2p-share/api/routers/index";
-import { useState } from "react";
 
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { AlertDialogProvider } from "@/hooks/use-alert-dialog";
-import { SocketProvider } from "@/hooks/use-socket";
-import { link, type orpc } from "@/utils/orpc";
-import "../index.css";
 import { E2EEncryptionProvider } from "@/hooks/use-e2e-encryption";
+import { SocketProvider } from "@/hooks/use-socket";
 
-export interface RouterAppContext {
-	orpc: typeof orpc;
-	queryClient: QueryClient;
-}
+import "../index.css";
 
-export const Route = createRootRouteWithContext<RouterAppContext>()({
+export const Route = createRootRouteWithContext()({
 	component: RootComponent,
 	head: () => ({
 		meta: [
@@ -46,9 +35,6 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 });
 
 function RootComponent() {
-	const [client] = useState<AppRouterClient>(() => createORPCClient(link));
-	const [_orpcUtils] = useState(() => createTanstackQueryUtils(client));
-
 	return (
 		<>
 			<HeadContent />
@@ -68,7 +54,6 @@ function RootComponent() {
 				<Toaster richColors />
 			</ThemeProvider>
 			<TanStackRouterDevtools position="bottom-left" />
-			<ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
 		</>
 	);
 }

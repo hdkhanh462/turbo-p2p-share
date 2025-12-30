@@ -13,16 +13,10 @@
 	"dependencies": {
 		"@fontsource-variable/roboto": "^5.2.9",
 		"@hookform/resolvers": "^5.2.2",
-		"@orpc/client": "^1.12.2",
-		"@orpc/server": "^1.12.2",
-		"@orpc/tanstack-query": "^1.12.2",
 		"@radix-ui/react-direction": "^1.1.1",
 		"@radix-ui/react-slot": "^1.2.3",
 		"@tailwindcss/vite": "^4.0.15",
-		"@tanstack/react-form": "^1.12.3",
-		"@tanstack/react-query": "^5.90.12",
 		"@tanstack/react-router": "^1.141.1",
-		"@turbo-p2p-share/api": "*",
 		"@turbo-p2p-share/shared": "*",
 		"@zxcvbn-ts/core": "^3.0.4",
 		"@zxcvbn-ts/language-common": "^3.0.4",
@@ -48,7 +42,6 @@
 		"zod": "^4.2.1"
 	},
 	"devDependencies": {
-		"@tanstack/react-query-devtools": "^5.91.1",
 		"@tanstack/react-router-devtools": "^1.141.1",
 		"@tanstack/router-plugin": "^1.141.1",
 		"@turbo-p2p-share/config": "*",

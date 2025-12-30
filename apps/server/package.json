@@ -10,10 +10,6 @@
 		"start": "node dist/index.mjs"
 	},
 	"dependencies": {
-		"@orpc/openapi": "^1.12.2",
-		"@orpc/server": "^1.12.2",
-		"@orpc/zod": "^1.12.2",
-		"@turbo-p2p-share/api": "*",
 		"@turbo-p2p-share/shared": "*",
 		"cors": "^2.8.5",
 		"dotenv": "^17.2.2",
