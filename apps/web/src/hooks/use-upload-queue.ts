@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
 	type AppSettingsState,
 	useAppSettings,
@@ -109,7 +109,10 @@ export function useUploadQueue(
 			});
 		} finally {
 			activeRef.current--;
-			cleanup();
+			if (headRef.current > 50) {
+				queueRef.current = queueRef.current.slice(headRef.current);
+				headRef.current = 0;
+			}
 			process();
 		}
 	};
@@ -135,12 +138,13 @@ export function useUploadQueue(
 		queueRef.current.splice(headRef.current, pending.length, ...pending);
 	};
 
-	const cleanup = () => {
-		if (headRef.current > 50) {
-			queueRef.current = queueRef.current.slice(headRef.current);
-			headRef.current = 0;
-		}
-	};
+	const cleanup = useCallback(() => {
+		queueRef.current = [];
+		headRef.current = 0;
+		activeRef.current = 0;
+		pausedRef.current = false;
+		setItems([]);
+	}, []);
 
 	const updateItem = (id: string, item: Partial<UploadItem>) => {
 		setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...item } : i)));
@@ -228,5 +232,6 @@ export function useUploadQueue(
 			pausedRef.current = false;
 			process();
 		},
+		cleanup,
 	};
 }

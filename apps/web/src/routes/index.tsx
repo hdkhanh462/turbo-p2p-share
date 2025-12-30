@@ -17,9 +17,7 @@ function HomeComponent() {
 
 	return (
 		<div className="flex min-h-screen items-center justify-center p-4 py-8">
-			<div className="w-full max-w-lg">
-				<ShareForm roomIdParam={roomId} />
-			</div>
+			<ShareForm roomIdParam={roomId} />
 		</div>
 	);
 }

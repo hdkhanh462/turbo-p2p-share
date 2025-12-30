@@ -1,6 +1,6 @@
 import type { ServerToClientHandlers } from "@turbo-p2p-share/shared/types/socket";
 import { useCallback, useEffect, useState } from "react";
-
+import type { ChatMessage } from "@/components/room-messages";
 import { useAlertDialog } from "@/hooks/use-alert-dialog";
 import type { SocketTyped } from "@/hooks/use-socket";
 
@@ -16,6 +16,7 @@ type RoomOptions = {
 	onRoomAccepted?: ServerToClientHandlers["room:accept"];
 	onRoomRejected?: ServerToClientHandlers["room:reject"];
 	onRoomTerminated?: ServerToClientHandlers["room:terminate"];
+	onRoomMessage?: ServerToClientHandlers["room:message"];
 };
 
 export const useRoomSocket = (
@@ -24,10 +25,18 @@ export const useRoomSocket = (
 ) => {
 	const [connecting, setConnecting] = useState(false);
 	const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
+	const [messages, setMessages] = useState<ChatMessage[]>([]);
 
 	const { alert, close } = useAlertDialog();
 
 	//#region HANDLERS
+	const cleanup = useCallback(() => {
+		setConnecting(false);
+		setCurrentRoomId(null);
+		setMessages([]);
+		close();
+	}, [close]);
+
 	const handleRoomCreated: ServerToClientHandlers["room:create"] = useCallback(
 		(payload) => {
 			options?.onRoomCreated?.(payload);
@@ -72,11 +81,10 @@ export const useRoomSocket = (
 	const handleRoomeRequestCancelled: ServerToClientHandlers["room:request-cancel"] =
 		useCallback(
 			(payload) => {
-				setConnecting(false);
-				close();
+				cleanup();
 				options?.onRoomRequestCancelled?.(payload);
 			},
-			[options, close],
+			[options, cleanup],
 		);
 
 	const handleAccepted: ServerToClientHandlers["room:accept"] = useCallback(
@@ -98,10 +106,18 @@ export const useRoomSocket = (
 
 	const handleTerminated: ServerToClientHandlers["room:terminate"] =
 		useCallback(() => {
-			setConnecting(false);
-			setCurrentRoomId(null);
+			cleanup();
 			options?.onRoomTerminated?.();
-		}, [options]);
+		}, [options, cleanup]);
+
+	const handleMessage: ServerToClientHandlers["room:message"] = useCallback(
+		(payload) => {
+			setMessages((prev) => [payload, ...prev]);
+			options?.onRoomMessage?.(payload);
+		},
+		[options],
+	);
+
 	//#endregion
 
 	useEffect(() => {
@@ -111,6 +127,7 @@ export const useRoomSocket = (
 		socket?.on("room:accept", handleAccepted);
 		socket?.on("room:reject", handleRejected);
 		socket?.on("room:terminate", handleTerminated);
+		socket?.on("room:message", handleMessage);
 
 		return () => {
 			socket?.off("room:create", handleRoomCreated);
@@ -119,6 +136,7 @@ export const useRoomSocket = (
 			socket?.off("room:accept", handleAccepted);
 			socket?.off("room:reject", handleRejected);
 			socket?.off("room:terminate", handleTerminated);
+			socket?.off("room:message", handleMessage);
 		};
 	}, [
 		socket,
@@ -128,6 +146,7 @@ export const useRoomSocket = (
 		handleAccepted,
 		handleRejected,
 		handleTerminated,
+		handleMessage,
 	]);
 
 	//#region PUBLIC API
@@ -148,7 +167,22 @@ export const useRoomSocket = (
 			socket?.emit("room:terminate", currentRoomId);
 		}
 	};
+
+	const sendMessage = (text: string) => {
+		if (currentRoomId) {
+			socket?.emit("room:message", { roomId: currentRoomId, text });
+		}
+	};
+
 	//#endregion
 
-	return { connecting, currentRoomId, request, cancelRequest, terminate };
+	return {
+		connecting,
+		currentRoomId,
+		messages,
+		request,
+		cancelRequest,
+		terminate,
+		sendMessage,
+	};
 };

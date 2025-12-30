@@ -135,6 +135,16 @@ export function useWebRtcReceiver(peer: RTCPeerConnection | null) {
 		},
 		[updateItem],
 	);
+
+	const cleanup = useCallback(() => {
+		channelsRef.current.forEach((channel) => {
+			if (channel.readyState !== "closed") {
+				channel.close();
+			}
+		});
+		channelsRef.current.clear();
+		tasksRef.current.clear();
+	}, []);
 	//#endregion
 
 	//#region CORE
@@ -172,13 +182,9 @@ export function useWebRtcReceiver(peer: RTCPeerConnection | null) {
 
 		return () => {
 			if (peer) peer.ondatachannel = null;
-			channelsRef.current.forEach((c) => {
-				c.close();
-			});
-			channelsRef.current.clear();
-			tasksRef.current.clear();
+			cleanup();
 		};
-	}, [peer, updateItem, handleBinary, handleControl]);
+	}, [peer, updateItem, handleBinary, handleControl, cleanup]);
 	//#endregion
 
 	return { items };

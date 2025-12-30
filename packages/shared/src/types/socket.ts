@@ -11,6 +11,11 @@ export type ServerToClientHandlers = {
 		reason: RoomAccessDenialReason;
 	}) => void;
 	"room:terminate": () => void;
+	"room:message": (payload: {
+		id: string;
+		senderId: string;
+		text: string;
+	}) => void;
 	"file:offer": (payload: {
 		roomId: string;
 		sdp: RTCSessionDescriptionInit;
@@ -30,6 +35,7 @@ export interface ClientToServerHandlers {
 		reason: RoomAccessDenialReason;
 	}) => void;
 	"room:terminate": (roomId: string) => void;
+	"room:message": (payload: { roomId: string; text: string }) => void;
 	"file:offer": (payload: {
 		roomId: string;
 		sdp: RTCSessionDescriptionInit;

@@ -51,6 +51,8 @@ export const useP2PSharing = (socket: SocketTyped | null) => {
 	);
 
 	const cleanup = () => {
+		sender.cleanup();
+		uploadQueue.cleanup();
 		peer?.close();
 		setPeer(null);
 	};
