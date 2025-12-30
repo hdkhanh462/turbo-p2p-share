@@ -1,3 +1,5 @@
+import type { EncryptedPayload } from "./e2e-encryption";
+
 type RoomAccessDenialReason = "ROOM_FULL" | "HOST_REJECTED" | "HOST_BUSY";
 
 export type ServerToClientHandlers = {
@@ -14,8 +16,9 @@ export type ServerToClientHandlers = {
 	"room:message": (payload: {
 		id: string;
 		senderId: string;
-		text: string;
+		encryptedMessage: EncryptedPayload;
 	}) => void;
+	"room:public-key": (payload: { roomId: string; publicKey: string }) => void;
 	"file:offer": (payload: {
 		roomId: string;
 		sdp: RTCSessionDescriptionInit;
@@ -35,7 +38,11 @@ export interface ClientToServerHandlers {
 		reason: RoomAccessDenialReason;
 	}) => void;
 	"room:terminate": (roomId: string) => void;
-	"room:message": (payload: { roomId: string; text: string }) => void;
+	"room:message": (payload: {
+		roomId: string;
+		encryptedMessage: EncryptedPayload;
+	}) => void;
+	"room:public-key": (payload: { roomId: string; publicKey: string }) => void;
 	"file:offer": (payload: {
 		roomId: string;
 		sdp: RTCSessionDescriptionInit;

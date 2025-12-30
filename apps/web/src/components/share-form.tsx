@@ -27,6 +27,7 @@ import {
 	FieldLabel,
 } from "@/components/ui/field";
 import { UploadFiles } from "@/components/upload-files";
+import { useE2EEncryption } from "@/hooks/use-e2e-encryption";
 import { useP2PSharing } from "@/hooks/use-p2p-sharing";
 import { useRoomSocket } from "@/hooks/use-room-socket";
 import { useSocket } from "@/hooks/use-socket";
@@ -49,6 +50,7 @@ type Props = {
 export const ShareForm = ({ roomIdParam }: Props) => {
 	const { socket, myRoomId } = useSocket();
 	const p2p = useP2PSharing(socket);
+	const e2ee = useE2EEncryption();
 
 	const form = useForm<FormSchema>({
 		resolver: zodResolver(formSchema),
@@ -99,8 +101,14 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 		onRoomMessage: (payload) => {
 			console.log("[Room] Message received:", payload);
 		},
-		onRoomAccepted: (payload) => {
+		onRoomPublicKey: async (payload) => {
+			console.log("[Room] Public Key received:", payload);
+			e2ee.setReceiverPublicKey(payload.publicKey);
+		},
+		onRoomAccepted: async (payload) => {
 			console.log("[Room] Accepted:", payload);
+			const publicKey = await e2ee.exportPublicKey();
+			socket?.emit("room:public-key", { roomId: payload.roomId, publicKey });
 		},
 		onRoomRejected: (payload) => {
 			console.log("[Room] Rejected: ", payload);
@@ -126,7 +134,9 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 	});
 
 	useEffect(() => {
-		socket?.emit("room:create", { roomId: myRoomId });
+		(async () => {
+			socket?.emit("room:create", { roomId: myRoomId });
+		})();
 	}, [socket, myRoomId]);
 
 	const handleRoomRequest = () => {
