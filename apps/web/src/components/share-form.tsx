@@ -150,7 +150,7 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 	return (
 		<div
 			className={cn(
-				"grid w-full gap-4",
+				"grid w-full gap-4 max-md:grid-cols-1",
 				currentRoomId ? "max-w-5xl grid-cols-2" : "max-w-lg grid-cols-1",
 			)}
 		>
