@@ -7,6 +7,7 @@ import z from "zod";
 import { InputCopyPaste } from "@/components/input-copy-paste";
 import Loader from "@/components/loader";
 import { ModeToggle } from "@/components/mode-toggle";
+import { NetworkClients } from "@/components/network-clients";
 import { QRDialog } from "@/components/qr-dialog";
 import { ReceivedFiles } from "@/components/received-files";
 import { RoomMessages } from "@/components/room-messages";
@@ -31,7 +32,6 @@ import { useE2EEncryption } from "@/hooks/use-e2e-encryption";
 import { useP2PSharing } from "@/hooks/use-p2p-sharing";
 import { useRoomSocket } from "@/hooks/use-room-socket";
 import { useSocket } from "@/hooks/use-socket";
-import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
 	myRoomId: z.string().nonempty("Room ID is required"),
@@ -49,7 +49,7 @@ type Props = {
 
 export const ShareForm = ({ roomIdParam }: Props) => {
 	const { socket, myRoomId } = useSocket();
-	const p2p = useP2PSharing(socket);
+	const p2p = useP2PSharing();
 	const e2ee = useE2EEncryption();
 
 	const form = useForm<FormSchema>({
@@ -73,7 +73,7 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 		cancelRequest,
 		terminate,
 		sendMessage,
-	} = useRoomSocket(socket, {
+	} = useRoomSocket({
 		onRoomCreated: ({ roomId }) => {
 			console.log("[Room] Created:", roomId);
 
@@ -148,12 +148,7 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 	};
 
 	return (
-		<div
-			className={cn(
-				"grid w-full gap-4 max-md:grid-cols-1",
-				currentRoomId ? "max-w-5xl grid-cols-2" : "max-w-lg grid-cols-1",
-			)}
-		>
+		<div className="grid w-full max-w-5xl grid-cols-2 gap-4 max-md:grid-cols-1">
 			<Card>
 				<CardHeader>
 					<CardTitle>P2P Share</CardTitle>
@@ -256,8 +251,10 @@ export const ShareForm = ({ roomIdParam }: Props) => {
 					</form>
 				</CardContent>
 			</Card>
-			{currentRoomId && (
+			{currentRoomId ? (
 				<RoomMessages messages={messages} onSendMessage={sendMessage} />
+			) : (
+				<NetworkClients />
 			)}
 		</div>
 	);
