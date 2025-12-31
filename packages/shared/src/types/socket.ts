@@ -2,6 +2,22 @@ import type { EncryptedPayload } from "./e2e-encryption";
 
 type RoomAccessDenialReason = "ROOM_FULL" | "HOST_REJECTED" | "HOST_BUSY";
 
+export type ClientInfo = {
+	id: string;
+	name: string;
+	deviceType:
+		| "console"
+		| "desktop"
+		| "embedded"
+		| "mobile"
+		| "smarttv"
+		| "tablet"
+		| "wearable"
+		| "xr"
+		| undefined;
+	deviceModel: string;
+};
+
 export type ServerToClientHandlers = {
 	error: (payload: { messages: string[] }) => void;
 	"room:create": (payload: { roomId: string }) => void;
@@ -25,6 +41,10 @@ export type ServerToClientHandlers = {
 	}) => void;
 	"file:answer": (payload: { sdp: RTCSessionDescriptionInit }) => void;
 	"file:candidate": (payload: { candidate: RTCIceCandidateInit }) => void;
+	"network:connect": (payload: { clients: ClientInfo[] }) => void;
+	"network:join": (payload: { client: ClientInfo }) => void;
+	"network:leave": (payload: { clientId: ClientInfo["id"] }) => void;
+	"network:request-cancel": (payload: { clientId: ClientInfo["id"] }) => void;
 };
 
 export interface ClientToServerHandlers {
@@ -55,4 +75,6 @@ export interface ClientToServerHandlers {
 		roomId: string;
 		candidate: RTCIceCandidateInit;
 	}) => void;
+	"network:request": (payload: { clientId: ClientInfo["id"] }) => void;
+	"network:request-cancel": (payload: { clientId: ClientInfo["id"] }) => void;
 }

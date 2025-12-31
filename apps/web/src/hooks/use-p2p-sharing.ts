@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import type { SocketTyped } from "@/hooks/use-socket";
+import { useSocket } from "@/hooks/use-socket";
 import { useUploadQueue } from "@/hooks/use-upload-queue";
 import { useWebRtcReceiver } from "@/hooks/use-webrtc-receiver";
 import { useWebRtcSender } from "@/hooks/use-webrtc-sender";
 
-export const useP2PSharing = (socket: SocketTyped | null) => {
+export const useP2PSharing = () => {
 	const [peer, setPeer] = useState<RTCPeerConnection | null>(null);
 
+	const { socket } = useSocket();
 	const sender = useWebRtcSender(peer);
 	const receiver = useWebRtcReceiver(peer);
 	const uploadQueue = useUploadQueue(sender);

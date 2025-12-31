@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ChatMessage } from "@/components/room-messages";
 import { useAlertDialog } from "@/hooks/use-alert-dialog";
 import { useE2EEncryption } from "@/hooks/use-e2e-encryption";
-import type { SocketTyped } from "@/hooks/use-socket";
+import { useSocket } from "@/hooks/use-socket";
 import { randomText } from "@/utils/random-text";
 
 type RoomOptions = {
@@ -22,14 +22,11 @@ type RoomOptions = {
 	onRoomPublicKey?: ServerToClientHandlers["room:public-key"];
 };
 
-export const useRoomSocket = (
-	socket: SocketTyped | null,
-	options?: RoomOptions,
-) => {
-	const [connecting, setConnecting] = useState(false);
+export const useRoomSocket = (options?: RoomOptions) => {
 	const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 
+	const { socket, connecting, setConnecting } = useSocket();
 	const { alert, close } = useAlertDialog();
 	const { encryptText, decryptText } = useE2EEncryption();
 
@@ -39,7 +36,7 @@ export const useRoomSocket = (
 		setCurrentRoomId(null);
 		setMessages([]);
 		close();
-	}, [close]);
+	}, [close, setConnecting]);
 
 	const handleRoomCreated: ServerToClientHandlers["room:create"] = useCallback(
 		(payload) => {
@@ -97,7 +94,7 @@ export const useRoomSocket = (
 			setCurrentRoomId(roomId);
 			options?.onRoomAccepted?.({ roomId });
 		},
-		[options],
+		[options, setConnecting],
 	);
 
 	const handleRejected: ServerToClientHandlers["room:reject"] = useCallback(
@@ -105,7 +102,7 @@ export const useRoomSocket = (
 			setConnecting(false);
 			options?.onRoomRejected?.(payload);
 		},
-		[options],
+		[options, setConnecting],
 	);
 
 	const handleTerminated: ServerToClientHandlers["room:terminate"] =
@@ -175,7 +172,6 @@ export const useRoomSocket = (
 
 	//#region PUBLIC API
 	const request = (roomId: string) => {
-		if (!socket?.id) return;
 		socket?.emit("room:request", { roomId });
 		setConnecting(true);
 	};

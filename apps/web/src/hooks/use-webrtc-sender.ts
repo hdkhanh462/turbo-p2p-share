@@ -73,11 +73,6 @@ export function useWebRtcSender(
 					type: "META",
 					id: task.id,
 					encryptedMeta,
-					// meta: {
-					// 	name: task.file.name,
-					// 	size: task.file.size,
-					// 	mime: task.file.type,
-					// },
 				});
 
 				console.log("[Sender] Sending file:", task.file);
